@@ -2,7 +2,6 @@
 
 **Turn career goals into measurable skills, verifiable proof, and actionable job readiness.**
 
-> 🏆 **SaarthiX Hackathon 2026 — Level 2 MVP Submission (19 October 2026)**
 > 🌐 **Live Application:** [https://skillforge-ai-q4tz.onrender.com](https://skillforge-ai-q4tz.onrender.com)
 > 📦 **GitHub Repository:** [https://github.com/tanmayyyyayyy/SkillForge-AI](https://github.com/tanmayyyyayyy/SkillForge-AI)
 > 🧪 **Test Suite:** **365 tests passing across 32 suites (100% pass rate)**
