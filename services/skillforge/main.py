@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 
 from . import config
 from .career import router as career_router
@@ -25,6 +25,7 @@ from .practice import router as practice_router
 from .review import enabled as ai_enabled
 from .sample import SNAPSHOT, SOURCES
 from .scanning import compile_snapshot, run_scans, source_for
+from .scoring import OPTIONAL, RUBRIC, finalize
 
 WORKER_ENABLED = os.getenv("SCAN_WORKER_ENABLED", "true").lower() == "true"
 DIST = config.ROOT / "apps" / "web" / "dist"
@@ -187,15 +188,36 @@ class ImportRequest(BaseModel):
     ai: bool = False
 
 
+class RubricApproval(BaseModel):
+    expected: list[str] = Field(default_factory=list, max_length=len(OPTIONAL))
+    note: str = Field(default="", max_length=600)
+
+
 def scan_view(row, details=False):
     response = {key: row[key] for key in ("id", "repo", "state", "created", "updated")}
     if row["result"]:
-        if details or row["state"] == "failed":
+        if row["state"] == "failed":
             response["result"] = row["result"]
-        else:
-            quality = row["result"]["quality"]
-            response["summary"] = {key: quality[key] for key in ("score", "rankable", "cohort", "version", "coverage")}
-            response["revision"] = row["result"]["revision"]
+            return response
+        payload = row["result"]
+        quality = payload["quality"]
+        response["revision"] = payload["revision"]
+        if row["state"] == "review":
+            if details:
+                preview = {key: value for key, value in quality.items() if key in (
+                    "scale", "version", "archetype", "cohort", "coverage", "features",
+                )}
+                preview["criteria"] = [
+                    {key: value for key, value in item.items() if key != "checks"} for item in quality["criteria"]
+                ]
+                response["result"] = {**payload, "quality": {**preview, "score": None, "rankable": False,
+                                                              "dimensions": [], "findings": []}}
+            return response
+        response["summary"] = {key: quality[key] for key in (
+            "score", "rankable", "cohort", "version", "coverage", "scale", "archetype", "grade", "comparisonKey",
+        ) if key in quality}
+        if details:
+            response["result"] = payload
     return response
 
 
@@ -252,6 +274,30 @@ def scan_details(scan_id: str, request: Request):
     return scan_view(lookup(owner_of(request), scan_id), details=True)
 
 
+@app.post("/api/scans/{scan_id}/rubric")
+def publish_rubric(scan_id: str, body: RubricApproval, request: Request):
+    owner = owner_of(request)
+    row = lookup(owner, scan_id)
+    if row["state"] == "complete":
+        return scan_view(row, details=True)
+    result = row["result"]
+    if row["state"] != "review" or result["quality"]["version"] != RUBRIC:
+        raise HTTPException(409, "This scan has no current rubric to approve.")
+    possible = {choice["id"] for choice in result["quality"]["criteria"]
+                if choice["relevance"] == "not_applicable"}
+    expected = sorted(set(body.expected))
+    if not set(expected).issubset(possible):
+        raise HTTPException(422, "Only excluded criteria can be marked as expected capabilities.")
+    updated = {**result, "quality": finalize(result["quality"], expected, body.note.strip())}
+    with engine.begin() as connection:
+        changed = connection.execute(update(scans).where(
+            scans.c.owner == owner, scans.c.id == scan_id, scans.c.state == "review",
+        ).values(state="complete", result=updated, updated=now()))
+    if changed.rowcount != 1:
+        return scan_view(lookup(owner, scan_id), details=True)
+    return scan_view({**row, "state": "complete", "result": updated, "updated": now()}, details=True)
+
+
 @app.delete("/api/scans/{scan_id}", status_code=204)
 def delete_scan(scan_id: str, request: Request):
     owner = owner_of(request)
@@ -264,7 +310,7 @@ def delete_scan(scan_id: str, request: Request):
 async def preview(scan_id: str, path: str, request: Request):
     row = lookup(owner_of(request), scan_id)
     result = row["result"]
-    if row["state"] != "complete" or path not in result["preview_paths"]:
+    if row["state"] not in {"complete", "review"} or path not in result["preview_paths"]:
         raise HTTPException(404, "This file is outside the analyzed source sample.")
     async with client() as http:
         try:

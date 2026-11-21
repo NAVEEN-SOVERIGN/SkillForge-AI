@@ -5,9 +5,10 @@ import secrets
 
 from sqlalchemy import select, update
 
-from .analysis import quality, structure
+from .analysis import structure
 from .db import engine, expire_guests, now, scans
 from .github import GitHubError, get_snapshot, source_href
+from .scoring import quality
 
 logger = logging.getLogger(__name__)
 LEASE_SECONDS = 360
@@ -72,7 +73,7 @@ async def perform(scan, lease):
             if scan["options"].get("ai"):
                 from .review import review
                 payload["review"] = await review(snapshot, payload["quality"])
-        await asyncio.to_thread(finish, scan["id"], lease, "complete", payload)
+        await asyncio.to_thread(finish, scan["id"], lease, "review", payload)
     except GitHubError as exc:
         await asyncio.to_thread(finish, scan["id"], lease, "failed", {"error": str(exc), "retryAt": exc.retry_at})
     except Exception as exc:  # noqa: BLE001 - Finish the job without exposing provider or repository content.

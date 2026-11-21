@@ -146,6 +146,16 @@ async def get_snapshot(repo):
             path: data for path, data in await asyncio.gather(*(fetch(entry) for entry in small[:MAX_FILES]))
             if data is not None
         }
+        context_names = {"readme", "readme.md", "readme.rst", "package.json", "pyproject.toml", "requirements.txt"}
+        context_files = sorted(
+            (entry for entry in files if entry["path"].rsplit("/", 1)[-1].lower() in context_names
+             and 0 < entry.get("size", 0) <= FILE_BYTES),
+            key=lambda entry: (entry["path"].count("/"), entry["path"]),
+        )[:6]
+        metadata_files = {
+            path: data for path, data in await asyncio.gather(*(fetch(entry) for entry in context_files))
+            if data is not None
+        }
         configs = sorted(path for path in paths if path.rsplit("/", 1)[-1] == "tsconfig.json")[:4]
         aliases = {}
         for path in configs:
@@ -190,7 +200,7 @@ async def get_snapshot(repo):
         "language": info.get("language"), "paths": paths, "sources": sources, "eligible": len(eligible),
         "total_files": len(files), "truncated": bool(tree.get("truncated")),
         "history": sorted(history, key=lambda item: item["date"] or "", reverse=True),
-        "history_available": history_available, "aliases": aliases,
+        "history_available": history_available, "aliases": aliases, "metadata_files": metadata_files,
     }
 
 

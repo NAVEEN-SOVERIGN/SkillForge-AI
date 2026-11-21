@@ -11,6 +11,7 @@ import type { Repository, Scan, Session, Snapshot } from './api'
 import { Practice } from './Practice'
 import { Career } from './Career'
 import { DecisionHistory } from './DecisionHistory'
+import { RubricPreview, RubricCriteria } from './RubricPreview'
 import './styles.css'
 
 const CodeGraph = lazy(() => import('./Graph').then(module => ({ default: module.CodeGraph })))
@@ -81,7 +82,8 @@ function App() {
     let alive = true
     setSnapshot(null)
     setLoadError('')
-    if (active && selectedState !== 'complete') return
+    if (active && selectedState !== 'complete' && selectedState !== 'review') return
+    if (selectedState === 'review') setTab('quality')
     const run = active
       ? api<Scan>('/scans/' + active).then(scan => scan.result as Snapshot)
       : api<Snapshot>('/sample')
@@ -126,6 +128,12 @@ function App() {
     } catch (error) { setNotice(errorText(error)) }
   }
 
+  async function approveRubric(expected: string[], note: string) {
+    if (!active) return
+    const published = await api<Scan>('/scans/' + active + '/rubric', 'POST', { expected, note })
+    setScans(current => current.map(row => row.id === published.id ? published : row))
+  }
+
   async function accountAction(remove: boolean) {
     setNotice('')
     try {
@@ -140,7 +148,7 @@ function App() {
 
   const summary = selectedRow?.result && 'error' in selectedRow.result ? selectedRow.result : null
   const comparable = scans.filter(row => row.id !== active && row.repo === snapshot?.repo && row.summary?.rankable
-    && snapshot?.quality.rankable && row.summary.version === snapshot?.quality.version && row.summary.cohort === snapshot?.quality.cohort)
+    && snapshot?.quality.rankable && scoreGroup(row.summary) === scoreGroup(snapshot.quality))
 
   return <>
     <header className="topbar">
@@ -201,7 +209,8 @@ function App() {
             {scans.map(scan => <div className={'library-row' + (scan.id === active ? ' active' : '')} key={scan.id}>
               <button className="library-item" onClick={() => openScan(scan.id)}>
                 <GitBranch size={17} /><span><strong>{scan.repo}</strong><small>{pending(scan) ? scan.state : scan.state === 'failed' ? 'Needs attention'
-                  : (scan.revision?.slice(0, 7) ?? 'Complete') + (scan.summary?.score != null ? ' · ' + scan.summary.score + '/100' : '')}</small></span>
+                  : scan.state === 'review' ? 'Rubric ready for review' : (scan.revision?.slice(0, 7) ?? 'Complete') +
+                  (scan.summary?.score != null ? ' · ' + scan.summary.score + '/' + (scan.summary.scale ?? 100) : '')}</small></span>
               </button>
               {!pending(scan) && <button className="icon-button tiny remove-scan" onClick={() => {
                 if (window.confirm('Remove this scan from your workspace?')) void removeScan(scan.id)
@@ -230,7 +239,8 @@ function App() {
               {tab === 'graph' && <Suspense fallback={<p className="status-panel" role="status">Loading code graph…</p>}>
                 <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />
               </Suspense>}
-              {tab === 'quality' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
+              {tab === 'quality' && selectedState === 'review' && <RubricPreview key={active} snapshot={snapshot} onApprove={approveRubric} />}
+              {tab === 'quality' && selectedState !== 'review' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
                 onPractice={id => { setPracticeFocus(id); setView('practice'); window.scrollTo(0, 0) }} />}
               {tab === 'history' && <DecisionHistory snapshot={snapshot} />}
             </>}
@@ -261,31 +271,38 @@ function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {
   const delta = previous?.summary?.score != null && quality.score != null ? quality.score - previous.summary.score : null
   return <div className="report">
     <section className="score-overview panel">
-      <div><p className="eyebrow">Provisional quality score</p><p className="score-number">{quality.score ?? '—'}<span> / 100</span></p>
+      <div><p className="eyebrow">{quality.archetype ? 'Repository engineering score' : 'Legacy quality score'}</p>
+        <p className="score-number">{quality.score ?? '—'}<span> / {quality.scale ?? 100}</span></p>
+        {quality.archetype && <p><strong>{quality.archetype}{quality.grade && ' · Grade ' + quality.grade}</strong></p>}
         <p>{quality.coverage.analyzed} of {quality.coverage.eligible} eligible files analyzed · {quality.coverage.percent}% coverage</p>
-        <p>{quality.rankable ? quality.cohort + ' cohort' : 'Unranked due to insufficient coverage'} · {quality.version}</p>
+        {quality.evaluationCoverage !== undefined && <p>{quality.evaluationCoverage}% of relevant weight measured · {quality.confidence} static confidence</p>}
+        <p>{quality.rankable ? quality.cohort + ' cohort' : 'Unranked · evaluation incomplete or challenged'} · {quality.version}</p>
+        {quality.severityCap != null && <p>Severe finding capped the score at {quality.severityCap}.</p>}
+        {quality.review?.note && <p>Open context question · {quality.review.note}</p>}
         {!!comparable.length && <label className="comparison">Compare with <select value={previous?.id ?? ''} onChange={event => onCompare(comparable.find(scan => scan.id === event.target.value))}>
           <option value="">Select revision</option>{comparable.map(scan => <option key={scan.id} value={scan.id}>{scan.revision?.slice(0, 7)} · {new Date(scan.created * 1000).toLocaleDateString()}</option>)}
         </select>{delta !== null && <strong>{delta > 0 ? '+' : ''}{delta} points</strong>}</label>}
       </div>
       <div className="dimensions">{quality.dimensions.map(dimension => <div key={dimension.name}>
-        <div className="split"><span>{dimension.name}</span><strong>{dimension.max ? dimension.points + '/' + dimension.max : 'N/A'}</strong></div>
+        <div className="split"><span>{dimension.name}</span><strong>{dimension.max ? dimension.points + '/' + dimension.max : 'Unmeasured'}</strong></div>
         <progress value={dimension.points} max={dimension.max || 1} aria-label={dimension.name} />
       </div>)}</div>
     </section>
+    {quality.criteria && <section className="panel"><h3>Project rubric</h3><RubricCriteria criteria={quality.criteria} /></section>}
     <section className="panel findings">
       <h3>Evidence and next steps</h3>
       <p>These checks look for common engineering signals in the sampled revision.</p>
-      {[...quality.findings].sort((a, b) => Number(a.state === 'met') - Number(b.state === 'met') || b.max - a.max).map(finding =>
+      {[...quality.findings].sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical') ||
+        Number(a.state === 'met') - Number(b.state === 'met') || b.max - a.max).map(finding =>
         <article key={finding.title}><div className="finding-icon">{finding.state === 'met' ? <CheckCircle size={22} /> : <Code size={22} />}</div>
           <div><h4>{finding.title}</h4><p>{finding.detail}</p>{finding.path && <small className="mono">{finding.url && !snapshot.sample
             ? <a href={finding.url} target="_blank" rel="noreferrer">{finding.path}:{finding.line} <ArrowUpRight size={13} /></a>
             : finding.path + ':' + finding.line}</small>}
-            {finding.state === 'review' && finding.dimension === 'Performance hygiene' && <button className="text-button"
+            {finding.state === 'review' && ['Performance hygiene', 'Performance'].includes(finding.dimension) && <button className="text-button"
               onClick={() => onPractice('load-monitor')}>Practice efficient processing</button>}
-            {finding.state === 'review' && finding.title === 'Test files are present' && <button className="text-button"
+            {finding.state === 'review' && ['Test files are present', 'Assertions in sampled tests'].includes(finding.title) && <button className="text-button"
               onClick={() => onPractice('support-coverage')}>Practice boundary cases</button>}</div>
-          <span className={'finding-pts ' + finding.state}>{finding.points}/{finding.max}</span></article>)}
+          <span className={'finding-pts ' + finding.state}>{finding.points == null ? 'Unmeasured' : finding.points + '/' + finding.max}</span></article>)}
     </section>
     {snapshot.review && <section className="panel findings">
       <h3><Sparkle size={20} /> Optional Gemini review</h3>
@@ -298,20 +315,25 @@ function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {
   </div>
 }
 
+function scoreGroup(summary: NonNullable<Scan['summary']>) {
+  return [summary.cohort, summary.version, summary.scale ?? 100, summary.comparisonKey ?? 'legacy'].join('|')
+}
+
 function Rankings({ scans, onOpen, onWorkspace }: { scans: Scan[]; onOpen: (id: string) => void; onWorkspace: () => void }) {
   const latest = [...new Map([...scans].reverse().filter(row => row.state === 'complete').map(row => [row.repo, row])).values()]
   const ranked = latest.filter(row => row.summary?.rankable && row.summary.score !== null)
-  const groups = Map.groupBy(ranked, row => (row.summary?.cohort ?? 'Unknown') + ' · ' + row.summary?.version)
+  const groups = Map.groupBy(ranked, row => scoreGroup(row.summary!))
   const unranked = latest.filter(row => !row.summary?.rankable)
   return <section className="ranking-page">
     <p className="eyebrow"><span className="accent-square" /> Repository quality</p>
     <h1>Repository rankings<span>.</span></h1>
-    <p>Compare the latest completed scan per repository within the same language cohort and scoring version.</p>
+    <p>Compare the latest completed scan per repository within the same project type, language cohort, and measured rubric.</p>
     {!latest.length && <div className="status-panel"><p>Analyze a public repository to start your rankings.</p><button className="button primary" onClick={onWorkspace}>Open workspace <ArrowRight size={16} /></button></div>}
-    {[...groups].map(([name, rows]) => <section className="panel rankings" key={name}><h2>{name}</h2>
+    {[...groups].map(([key, rows]) => <section className="panel rankings" key={key}>
+      <h2>{[rows[0].summary?.archetype, rows[0].summary?.cohort, rows[0].summary?.version].filter(Boolean).join(' · ')}</h2>
       {rows.sort((a, b) => (b.summary?.score ?? 0) - (a.summary?.score ?? 0)).map((row, index, ordered) =>
         <button key={row.id} onClick={() => onOpen(row.id)}><span>{ordered.findIndex(item => item.summary?.score === row.summary?.score) + 1 || index + 1}</span>
-          <strong>{row.repo}</strong><span>{row.summary?.coverage.percent}% coverage</span><strong>{row.summary?.score}/100</strong><ArrowUpRight size={17} /></button>)}
+          <strong>{row.repo}</strong><span>{row.summary?.coverage.percent}% coverage</span><strong>{row.summary?.score}/{row.summary?.scale ?? 100}</strong><ArrowUpRight size={17} /></button>)}
     </section>)}
     {!!unranked.length && <section className="panel rankings"><h2>Unranked</h2>{unranked.map(row => <button key={row.id} onClick={() => onOpen(row.id)}>
       <span>—</span><strong>{row.repo}</strong><span>{row.summary?.coverage.percent}% coverage</span><span>Partial</span><ArrowUpRight size={17} /></button>)}</section>}
