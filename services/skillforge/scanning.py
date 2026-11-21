@@ -3,10 +3,8 @@ import asyncio
 import logging
 import secrets
 
-from sqlalchemy import select, update
-
 from .analysis import structure
-from .db import engine, expire_guests, now, scans
+from .db import encode, entity, expire_guests, now, transaction
 from .github import GitHubError, get_snapshot, source_href
 from .scoring import quality
 
@@ -26,27 +24,45 @@ def compile_snapshot(snapshot):
 
 
 def claim():
-    with engine.begin() as connection:
-        connection.execute(update(scans).where(
-            scans.c.state == "running", scans.c.updated < now() - LEASE_SECONDS,
-        ).values(state="queued", lease=None, updated=now()))
-        candidate = connection.execute(select(scans).where(
-            scans.c.state == "queued",
-        ).order_by(scans.c.created).limit(1)).mappings().first()
-        if not candidate:
+    timestamp = now()
+    lease = secrets.token_hex(24)
+    with transaction(write=True) as tx:
+        pending = tx.run("""
+            RETURN EXISTS { MATCH (:SFScan {state: 'queued'}) } OR EXISTS {
+                MATCH (s:SFScan {state: 'running'}) WHERE s.updated < $cutoff
+            } AS pending
+            """, cutoff=timestamp - LEASE_SECONDS).single()["pending"]
+        if not pending:
             return None
-        lease = secrets.token_hex(24)
-        changed = connection.execute(update(scans).where(
-            scans.c.id == candidate["id"], scans.c.state == "queued",
-        ).values(state="running", lease=lease, updated=now()))
-        return (dict(candidate), lease) if changed.rowcount == 1 else None
+        tx.run("""
+            MATCH (store:SFStore {id: 'skillforge'})
+            SET store.queueVersion = store.queueVersion + 1
+            """).consume()
+        tx.run("""
+            MATCH (s:SFScan {state: 'running'}) WHERE s.updated < $cutoff
+            WITH s ORDER BY s.updated LIMIT 100
+            SET s.lock = coalesce(s.lock, 0) + 1
+            WITH s WHERE s.state = 'running' AND s.updated < $cutoff
+            SET s.state = 'queued', s.lease = null, s.updated = $now
+            """, cutoff=timestamp - LEASE_SECONDS, now=timestamp).consume()
+        row = tx.run("""
+            MATCH (s:SFScan {state: 'queued'})
+            WITH s ORDER BY s.created, s.id LIMIT 1
+            SET s.lock = coalesce(s.lock, 0) + 1
+            SET s.state = 'running', s.lease = $lease, s.updated = $now
+            RETURN s AS node
+            """, lease=lease, now=timestamp).single()
+        return (entity(row), lease) if row else None
 
 
 def finish(scan_id, lease, state, result):
-    with engine.begin() as connection:
-        connection.execute(update(scans).where(
-            scans.c.id == scan_id, scans.c.lease == lease, scans.c.state == "running",
-        ).values(state=state, result=result, lease=None, updated=now()))
+    with transaction(write=True) as tx:
+        tx.run("""
+            MATCH (s:SFScan {id: $id})
+            SET s.lock = coalesce(s.lock, 0) + 1
+            WITH s WHERE s.lease = $lease AND s.state = 'running'
+            SET s.state = $state, s.result = $result, s.lease = null, s.updated = $now
+            """, id=scan_id, lease=lease, state=state, result=encode(result), now=now()).consume()
 
 
 async def run_scans():

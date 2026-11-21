@@ -14,8 +14,8 @@ COPY services/pyproject.toml services/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY services/skillforge/ ./skillforge/
 COPY --from=frontend /build/dist /app/apps/web/dist
-ENV PATH="/app/services/.venv/bin:$PATH" APP_ENV=production SCAN_WORKER_ENABLED=false
+ENV PATH="/app/services/.venv/bin:$PATH" APP_ENV=production
 RUN useradd --system --uid 10001 --no-create-home skillforge
 USER 10001
 EXPOSE 8765
-CMD ["python", "-m", "uvicorn", "skillforge.main:app", "--host", "0.0.0.0", "--port", "8765", "--no-access-log"]
+CMD ["sh", "-c", "if [ \"$RENDER\" = true ]; then python -m skillforge.migrate || exit 1; else export SCAN_WORKER_ENABLED=\"${SCAN_WORKER_ENABLED:-false}\"; fi; exec python -m uvicorn skillforge.main:app --host 0.0.0.0 --port \"${PORT:-8765}\" --no-access-log"]

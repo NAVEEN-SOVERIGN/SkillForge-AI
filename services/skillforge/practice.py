@@ -1,12 +1,12 @@
 
+import asyncio
 from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import delete, insert, select, update
 
-from .config import JUDGE_TOKEN, JUDGE_URL
-from .db import attempts, digest, engine, now, sessions
+from .config import COOKIE, JUDGE_TOKEN, JUDGE_URL
+from .db import encode, now, recent_attempts, transaction, workspace_write
 from .practice_contract import Submission
 from .problem_scoring import assess_submission, best_assessments, next_problem
 from .problems import PROBLEM_VERSION, PROBLEMS
@@ -23,10 +23,8 @@ def catalog():
 def history(request: Request):
     from .main import owner_of
     owner = owner_of(request)
-    with engine.connect() as connection:
-        rows = connection.execute(select(attempts).where(
-            attempts.c.owner == owner,
-        ).order_by(attempts.c.created.desc()).limit(100)).mappings().all()
+    with transaction() as tx:
+        rows = recent_attempts(tx, owner, 100)
     return [
         {"id": row["id"], "problem": row["problem"], "created": row["created"], **row["result"]}
         for row in rows if not row["result"].get("pending")
@@ -37,36 +35,43 @@ def history(request: Request):
 def recommendation(request: Request):
     from .main import owner_of
     owner = owner_of(request)
-    with engine.connect() as connection:
-        rows = connection.execute(select(attempts.c.result, attempts.c.problem).where(
-            attempts.c.owner == owner,
-        ).order_by(attempts.c.created.desc()).limit(250)).mappings().all()
+    with transaction() as tx:
+        rows = recent_attempts(tx, owner, 250)
     return {"next": next_problem(best_assessments(rows), PROBLEMS)}
+
+
+def reserve_attempt(owner, token, key, problem):
+    timestamp = now()
+    with workspace_write(owner, token) as tx:
+        recent = recent_attempts(tx, owner, 12, after=timestamp - 300)
+        if len(recent) >= 9 or any(row["result"].get("pending") and row["created"] > timestamp - 90
+                                   for row in recent):
+            raise HTTPException(429, "Wait for the current evaluation or try again shortly.")
+        tx.run("""
+            CREATE (:SFAttempt {id: $id, owner: $owner, problem: $problem, created: $now, result: $result})
+            """, id=key, owner=owner, problem=problem, now=timestamp, result=encode({"pending": True})).consume()
+
+
+def finish_attempt(owner, key, result=None):
+    with transaction(write=True) as tx:
+        if result is None:
+            tx.run("MATCH (a:SFAttempt {id: $id, owner: $owner}) DELETE a", id=key, owner=owner).consume()
+        else:
+            tx.run("MATCH (a:SFAttempt {id: $id, owner: $owner}) SET a.result = $result",
+                   id=key, owner=owner, result=encode(result)).consume()
 
 
 @router.post("/submit")
 async def submit(body: Submission, request: Request):
-    from .config import COOKIE
     from .main import owner_of
-    owner = owner_of(request)
+    owner = await asyncio.to_thread(owner_of, request)
     problem = PROBLEMS.get(body.problem)
     if not problem:
         raise HTTPException(404, "Exercise unavailable.")
     if not JUDGE_URL or not JUDGE_TOKEN:
         raise HTTPException(503, "Code submissions require a configured isolated evaluator.")
     key = str(uuid4())
-    with engine.begin() as connection:
-        connection.execute(select(sessions.c.token).where(
-            sessions.c.token == digest(request.cookies[COOKIE]),
-        ).with_for_update()).first()
-        recent = connection.execute(select(attempts.c.result, attempts.c.created).where(
-            attempts.c.owner == owner, attempts.c.created > now() - 300,
-        ).limit(12)).mappings().all()
-        if len(recent) >= 9 or any(row["result"].get("pending") and row["created"] > now() - 90 for row in recent):
-            raise HTTPException(429, "Wait for the current evaluation or try again shortly.")
-        connection.execute(insert(attempts).values(
-            id=key, owner=owner, problem=body.problem, created=now(), result={"pending": True},
-        ))
+    await asyncio.to_thread(reserve_attempt, owner, request.cookies[COOKIE], key, body.problem)
     try:
         async with httpx.AsyncClient(timeout=65, follow_redirects=False) as http:
             response = await http.post(JUDGE_URL + "/evaluate", json=body.model_dump(),
@@ -90,14 +95,8 @@ async def submit(body: Submission, request: Request):
         if not body.examples_only:
             result.update({"topic": problem.topic, "walkthrough": problem.walkthrough,
                            "assessment": assess_submission(cases, body.language, body.code)})
-        with engine.begin() as connection:
-            if body.examples_only:
-                connection.execute(delete(attempts).where(attempts.c.id == key, attempts.c.owner == owner))
-            else:
-                connection.execute(update(attempts).where(attempts.c.id == key, attempts.c.owner == owner)
-                                   .values(result=result))
+        await asyncio.to_thread(finish_attempt, owner, key, None if body.examples_only else result)
         return result
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
-        with engine.begin() as connection:
-            connection.execute(delete(attempts).where(attempts.c.id == key, attempts.c.owner == owner))
+        await asyncio.to_thread(finish_attempt, owner, key)
         raise HTTPException(503, "The isolated evaluator is busy or unavailable. Try again shortly.") from exc

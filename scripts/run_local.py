@@ -12,7 +12,7 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
+import time
 import webbrowser
 from contextlib import contextmanager, suppress
 from importlib import import_module
@@ -20,6 +20,8 @@ from pathlib import Path
 from urllib import request
 
 import uvicorn
+from neo4j import GraphDatabase
+from neo4j.exceptions import DriverError, Neo4jError
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "apps" / "web"
@@ -131,20 +133,58 @@ def ready(origin):
         raise RuntimeError("SkillForge did not pass its local startup check. Review the server output above.") from exc
 
 
-async def serve(reservation, database, args):
+@contextmanager
+def local_database(check):
+    if os.environ.get("NEO4J_URI") and not check:
+        yield
+        return
+    docker = shutil.which("docker")
+    if not docker:
+        raise RuntimeError("Start Docker for a local Neo4j database or set NEO4J_URI in .env.local.")
+    command = [docker, "run", "--rm", "-d", "--publish", "127.0.0.1::7687", "--env", "NEO4J_AUTH=none"]
+    if not check:
+        checkout = hashlib.sha256(os.fsencode(ROOT)).hexdigest()[:12]
+        command += ["--volume", f"skillforge-neo4j-{checkout}:/data"]
+    command.append("neo4j:5.26.27-community")
+    print("Starting a local Neo4j database (the first run downloads its image)...", flush=True)
+    try:
+        container = subprocess.check_output(command, text=True).strip()
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("Docker could not start Neo4j. Check that the Docker engine is running.") from exc
+    try:
+        output = subprocess.check_output([docker, "port", container, "7687/tcp"], text=True)
+        endpoint = re.fullmatch(r"127\.0\.0\.1:(\d+)", output.strip())
+        if not endpoint:
+            raise RuntimeError("Docker did not publish Neo4j on localhost.")
+        uri = "bolt://127.0.0.1:" + endpoint[1]
+        with GraphDatabase.driver(uri, connection_timeout=2, connection_acquisition_timeout=3) as driver:
+            deadline = time.monotonic() + 90
+            while True:
+                try:
+                    driver.verify_connectivity()
+                    break
+                except (DriverError, Neo4jError) as exc:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Neo4j did not start in time. Check Docker's container logs.") from exc
+                    time.sleep(1)
+        os.environ.update(NEO4J_URI=uri, NEO4J_USERNAME="neo4j", NEO4J_PASSWORD="", NEO4J_DATABASE="neo4j")
+        yield
+    finally:
+        subprocess.run([docker, "stop", container], stdout=subprocess.DEVNULL, check=False)
+
+
+async def serve(reservation, args):
     port = reservation.getsockname()[1]
     origin = f"http://{HOST}:{port}"
     callback = origin + "/api/auth/github/callback"
     os.environ.update(
         APP_ENV="development",
         APP_ORIGIN=origin,
-        DATABASE_URL="sqlite:///" + database.as_posix(),
         SCAN_WORKER_ENABLED="true",
         GITHUB_OAUTH_CALLBACK_URL=callback,
     )
     sys.path.insert(0, str(SERVICES))
     app = import_module("skillforge.main").app
-    engine = import_module("skillforge.db").engine
     server = uvicorn.Server(uvicorn.Config(
         app, host=HOST, port=port, access_log=False, timeout_graceful_shutdown=5,
     ))
@@ -175,14 +215,11 @@ async def serve(reservation, database, args):
         await task
     finally:
         server.should_exit = True
-        try:
-            if not task.done():
-                if not server.started:
-                    task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await task
-        finally:
-            engine.dispose()
+        if not task.done():
+            if not server.started:
+                task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 def main():
@@ -193,11 +230,8 @@ def main():
             if args.port is None and port != DEFAULT_PORT:
                 print(f"Port {DEFAULT_PORT} is occupied or unavailable. Using {port}.")
             prepare_web(args.reinstall)
-            if args.check:
-                with tempfile.TemporaryDirectory(prefix="check-", dir=STATE) as directory:
-                    asyncio.run(serve(reservation, Path(directory) / "skillforge.db", args))
-            else:
-                asyncio.run(serve(reservation, ROOT / ".skillforge.db", args))
+            with local_database(args.check):
+                asyncio.run(serve(reservation, args))
     except KeyboardInterrupt:
         return 0
     except (RuntimeError, OSError, subprocess.SubprocessError) as exc:

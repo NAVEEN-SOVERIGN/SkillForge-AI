@@ -1,4 +1,3 @@
-
 services:
   - type: web
     name: skillforge-integrated
@@ -7,19 +6,14 @@ services:
     region: singapore
     plan: free
     healthCheckPath: /api/health
-    dockerCommand: >-
-      sh -c 'python -m skillforge.migrate && exec python -m uvicorn skillforge.main:app
-      --host 0.0.0.0 --port "${PORT:-10000}" --no-access-log'
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: skillforge-integrated-db
-          property: connectionString
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USERNAME
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: NEO4J_DATABASE
+        sync: false
       - key: SCAN_WORKER_ENABLED
         value: "true"
-
-databases:
-  - name: skillforge-integrated-db
-    region: singapore
-    plan: free
-    ipAllowList: []

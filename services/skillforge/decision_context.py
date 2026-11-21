@@ -1,11 +1,13 @@
 """Retrieve cited decision paths from the authorized scan's bounded public history."""
 
-import os
+import asyncio
 import re
 from itertools import pairwise
-from urllib.parse import quote, urlsplit
 
-import httpx
+from neo4j.exceptions import DriverError, Neo4jError
+
+from . import config
+from .db import driver
 
 TERMS = re.compile(r"[a-z0-9_]{3,}", re.IGNORECASE)
 STOP = {"the", "and", "for", "are", "was", "were", "has", "have", "why", "how", "what", "when", "did", "does", "this", "that", "with", "from", "about", "code", "file"}
@@ -133,47 +135,21 @@ def local_paths(params):
             for row in params["records"] if row["id"] in candidates]
 
 
-def neo4j_endpoint():
-    configured = os.getenv("NEO4J_QUERY_URL") or os.getenv("NEO4J_URI", "").replace("neo4j+s://", "https://", 1)
-    url = urlsplit(configured)
-    if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment:
-        raise ValueError("Invalid Neo4j URL")
-    database = quote(os.getenv("NEO4J_DATABASE", "neo4j"), safe="")
-    return f"https://{url.netloc}/db/{database}/query/v2/tx"
-
-
-async def neo4j_paths(params):
-    endpoint = neo4j_endpoint()
-    auth = (os.getenv("NEO4J_USERNAME") or "neo4j", os.environ["NEO4J_PASSWORD"])
-    async with httpx.AsyncClient(auth=auth, timeout=5) as http:
-        response = await http.post(endpoint, json={"statement": PROJECT, "parameters": params})
-        response.raise_for_status()
-        payload = response.json()
-        transaction = payload.get("transaction", {}).get("id", "")
-        if not re.fullmatch(r"[\w-]+", transaction, re.ASCII):
-            raise ValueError("Neo4j did not open a transaction")
-        headers = {}
-        if affinity := response.headers.get("neo4j-cluster-affinity"):
-            headers["neo4j-cluster-affinity"] = affinity
-        try:
-            if payload.get("errors"):
-                raise ValueError("Neo4j query failed")
-            return payload["data"]["values"]
-        finally:
-            try:
-                await http.delete(f"{endpoint}/{transaction}", headers=headers)
-            except httpx.HTTPError:
-                pass  # An uncommitted transaction also expires on the server.
+def neo4j_paths(params):
+    with driver().session(database=config.NEO4J_DATABASE) as session, session.begin_transaction(timeout=5) as tx:
+        paths = tx.run(PROJECT, params).values()
+        tx.rollback()
+        return paths
 
 
 async def explain(snapshot, question, path, through, use_neo4j=False):
     records, params = project(snapshot, question, path, through)
     mode = "local"
-    if use_neo4j and os.getenv("NEO4J_PASSWORD") and params["records"]:
+    if use_neo4j and params["records"]:
         try:
-            paths = await neo4j_paths(params)
+            paths = await asyncio.to_thread(neo4j_paths, params)
             mode = "neo4j"
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        except (DriverError, Neo4jError):
             paths = local_paths(params)
             mode = "fallback"
     else:

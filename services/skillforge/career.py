@@ -1,4 +1,5 @@
 
+import json
 import re
 from io import BytesIO
 from typing import Literal
@@ -7,10 +8,9 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import insert, select, update
-from sqlalchemy.exc import IntegrityError
 
-from .db import attempts, engine, now, profiles, scans
+from .config import COOKIE
+from .db import encode, entities, find_attempt, find_scan, now, recent_attempts, transaction, workspace_write
 from .problem_scoring import best_assessments, developer_index
 from .scoring import RUBRIC
 
@@ -57,23 +57,14 @@ def make_profile():
     return {"role": "Software engineer", "description": "", "hours": 5, "evidence": [], "actions": [], "audit": []}
 
 
-def stored_profile(connection, owner):
-    row = connection.execute(select(profiles).where(profiles.c.owner == owner)).mappings().first()
-    return (row["data"], row["revision"]) if row else (make_profile(), None)
+def stored_profile(tx, owner):
+    row = tx.run("MATCH (p:SFProfile {owner: $owner}) RETURN properties(p) AS profile", owner=owner).single()
+    return json.loads(row["profile"]["data"]) if row else make_profile()
 
 
-def save_profile(connection, owner, data, revision):
-    try:
-        if revision is None:
-            connection.execute(insert(profiles).values(owner=owner, data=data, revision=1))
-            return
-        result = connection.execute(update(profiles).where(
-            profiles.c.owner == owner, profiles.c.revision == revision,
-        ).values(data=data, revision=revision + 1))
-        if result.rowcount != 1:
-            raise HTTPException(409, "The plan changed. Refresh and try again.")
-    except IntegrityError as exc:
-        raise HTTPException(409, "The plan changed. Refresh and try again.") from exc
+def save_profile(tx, owner, data):
+    tx.run("MERGE (p:SFProfile {owner: $owner}) SET p.data = $data",
+           owner=owner, data=encode(data)).consume()
 
 
 def requirements(data):
@@ -100,8 +91,8 @@ def response_data(data):
 @router.get("")
 def career(request: Request):
     owner = workspace(request)
-    with engine.connect() as connection:
-        data, _ = stored_profile(connection, owner)
+    with transaction() as tx:
+        data = stored_profile(tx, owner)
     return response_data(data)
 
 
@@ -110,16 +101,15 @@ def skills_index(request: Request):
     from .main import current_session
     owner = workspace(request)
     login = (current_session(request) or {}).get("github")
-    with engine.connect() as connection:
-        assessed = connection.execute(select(attempts.c.problem, attempts.c.result).where(
-            attempts.c.owner == owner,
-        ).order_by(attempts.c.created.desc()).limit(250)).mappings().all()
+    with transaction() as tx:
+        assessed = recent_attempts(tx, owner, 250)
         engineering = None
         repository = None
         if login:
-            entries = connection.execute(select(scans.c.repo, scans.c.result).where(
-                scans.c.owner == owner, scans.c.state == "complete", scans.c.repo.startswith(login.lower() + "/"),
-            ).order_by(scans.c.created.desc(), scans.c.id.desc()).limit(100)).mappings()
+            entries = entities(tx, """
+                MATCH (s:SFScan {owner: $owner, state: 'complete'}) WHERE s.repo STARTS WITH $prefix
+                RETURN s AS node ORDER BY s.created DESC, s.id DESC LIMIT 100
+                """, owner=owner, prefix=login.lower() + "/")
             seen = set()
             for row in entries:
                 if row["repo"] in seen:
@@ -137,21 +127,19 @@ def target(body: Target, request: Request):
     owner = workspace(request)
     if body.role not in ROLES:
         raise HTTPException(422, "Choose a supported role.")
-    with engine.begin() as connection:
-        data, revision = stored_profile(connection, owner)
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        data = stored_profile(tx, owner)
         data.update(body.model_dump())
-        save_profile(connection, owner, data, revision)
+        save_profile(tx, owner, data)
     return response_data(data)
 
 
 @router.post("/evidence", status_code=201)
 def attach(body: Evidence, request: Request):
     owner = workspace(request)
-    table = scans if body.kind == "repository" else attempts
-    with engine.begin() as connection:
-        row = connection.execute(select(table).where(
-            table.c.id == body.reference, table.c.owner == owner,
-        )).mappings().first()
+    find_evidence = find_scan if body.kind == "repository" else find_attempt
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        row = find_evidence(tx, owner, body.reference)
         if not row or not row["result"]:
             raise HTTPException(404, "The evidence is unavailable in this workspace.")
         result = row["result"]
@@ -163,7 +151,7 @@ def attach(body: Evidence, request: Request):
             label = f"Evaluator result · {result['passed']}/{result['total']} cases"
         else:
             raise HTTPException(422, "Attach completed analysis or assessment work.")
-        data, revision = stored_profile(connection, owner)
+        data = stored_profile(tx, owner)
         if any((item["kind"], item["reference"]) == (body.kind, body.reference) for item in data["evidence"]):
             raise HTTPException(409, "This result is already linked to your portfolio.")
         if len(data["evidence"]) >= 100:
@@ -172,25 +160,25 @@ def attach(body: Evidence, request: Request):
             "id": str(uuid4()), "kind": body.kind, "reference": body.reference, "title": title,
             "label": label, "note": body.note.strip(), "at": now(),
         })
-        save_profile(connection, owner, data, revision)
+        save_profile(tx, owner, data)
     return response_data(data)
 
 
 @router.delete("/evidence/{key}")
 def remove_evidence(key: str, request: Request):
     owner = workspace(request)
-    with engine.begin() as connection:
-        data, revision = stored_profile(connection, owner)
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        data = stored_profile(tx, owner)
         data["evidence"] = [item for item in data["evidence"] if item["id"] != key]
-        save_profile(connection, owner, data, revision)
+        save_profile(tx, owner, data)
     return response_data(data)
 
 
 @router.post("/actions", status_code=201)
 def propose(body: ActionRequest, request: Request):
     owner = workspace(request)
-    with engine.begin() as connection:
-        data, revision = stored_profile(connection, owner)
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        data = stored_profile(tx, owner)
         if body.skill not in requirements(data):
             raise HTTPException(422, "Choose a skill from the current role plan.")
         if len(data["actions"]) >= 100 or any(
@@ -201,15 +189,15 @@ def propose(body: ActionRequest, request: Request):
         action = {"id": str(uuid4()), "skill": body.skill, "state": "proposed", "created": now()}
         data["actions"].insert(0, action)
         audit(data, action["id"], action["state"])
-        save_profile(connection, owner, data, revision)
+        save_profile(tx, owner, data)
     return response_data(data)
 
 
 @router.patch("/actions/{key}")
 def transition(key: str, body: Transition, request: Request):
     owner = workspace(request)
-    with engine.begin() as connection:
-        data, revision = stored_profile(connection, owner)
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        data = stored_profile(tx, owner)
         action = next((item for item in data["actions"] if item["id"] == key), None)
         if not action:
             raise HTTPException(404, "Action unavailable.")
@@ -217,7 +205,7 @@ def transition(key: str, body: Transition, request: Request):
             raise HTTPException(409, "This action has already moved to a different stage.")
         action["state"] = body.state
         audit(data, key, body.state)
-        save_profile(connection, owner, data, revision)
+        save_profile(tx, owner, data)
     return response_data(data)
 
 
@@ -258,8 +246,8 @@ def report(request: Request):
     import textwrap
 
     owner = workspace(request)
-    with engine.connect() as connection:
-        data, _ = stored_profile(connection, owner)
+    with transaction() as tx:
+        data = stored_profile(tx, owner)
     lines = ["SkillForge | Learning and evidence report", "", data["role"],
              f"Weekly time budget: {data['hours']} hours", "", "Requirements"]
     lines.extend(requirements(data))

@@ -15,12 +15,26 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from neo4j.exceptions import DriverError, Neo4jError
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select, update
 
 from . import config
 from .career import router as career_router
-from .db import attempts, digest, engine, now, profiles, provision, scans, session, sessions, touch
+from .db import (
+    WorkspaceExpired,
+    close,
+    encode,
+    entities,
+    entity,
+    erase,
+    find_scan,
+    now,
+    provision,
+    session,
+    touch,
+    transaction,
+    workspace_write,
+)
 from .decision_context import explain
 from .github import (
     CONTRIBUTION_LABELS,
@@ -47,15 +61,18 @@ OAUTH_COOKIE = "__Host-skillforge-oauth" if config.PRODUCTION else "skillforge-o
 
 @asynccontextmanager
 async def lifespan(_app):
-    await asyncio.to_thread(require_current_schema if config.PRODUCTION else migrate)
-    worker = asyncio.create_task(run_scans()) if WORKER_ENABLED else None
+    worker = None
     try:
+        await asyncio.to_thread(require_current_schema if config.PRODUCTION else migrate)
+        if WORKER_ENABLED:
+            worker = asyncio.create_task(run_scans())
         yield
     finally:
         if worker:
             worker.cancel()
             with suppress(asyncio.CancelledError):
                 await worker
+        await asyncio.to_thread(close)
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -96,6 +113,17 @@ async def github_failure(_request, exc):
     return JSONResponse({"detail": str(exc), "retryAt": exc.retry_at}, 429 if exc.retry_at else 502)
 
 
+@app.exception_handler(WorkspaceExpired)
+async def expired_workspace(_request, _exc):
+    return JSONResponse({"detail": "Your workspace expired. Refresh to start a new session."}, 401)
+
+
+@app.exception_handler(DriverError)
+@app.exception_handler(Neo4jError)
+async def database_failure(_request, _exc):
+    return JSONResponse({"detail": "The workspace database is temporarily unavailable."}, 503)
+
+
 def write_cookie(response, token, github=False):
     response.set_cookie(config.COOKIE, token, httponly=True, secure=config.PRODUCTION,
                         samesite="lax", max_age=30 * 86400 if github else None, path="/")
@@ -117,8 +145,8 @@ def owner_of(request):
 
 @app.get("/api/health")
 def health():
-    with engine.connect() as connection:
-        connection.execute(select(1))
+    with transaction() as tx:
+        tx.run("RETURN 1").consume()
     return {"ok": True}
 
 
@@ -188,9 +216,8 @@ def logout(request: Request):
 @app.delete("/api/account")
 def erase_workspace(request: Request):
     owner = owner_of(request)
-    with engine.begin() as connection:
-        for table in (scans, attempts, profiles, sessions):
-            connection.execute(delete(table).where(table.c.owner == owner))
+    with workspace_write(owner, request.cookies[config.COOKIE]) as tx:
+        erase(tx, owner)
     response = Response(status_code=204)
     write_cookie(response, provision())
     return response
@@ -198,7 +225,7 @@ def erase_workspace(request: Request):
 
 @app.get("/api/github/repos")
 async def list_github(request: Request, page: int = 1):
-    account = current_session(request)
+    account = await asyncio.to_thread(current_session, request)
     if not account or not account["github"]:
         raise HTTPException(401, "Connect GitHub to browse your public repositories.")
     return await public_repositories(account["github"], min(10, max(1, page)))
@@ -251,40 +278,41 @@ def start_scan(body: ImportRequest, request: Request):
         raise HTTPException(422, str(exc)) from exc
     if body.ai and not ai_enabled():
         raise HTTPException(409, "AI review is unavailable. Start a static review instead.")
-    with engine.begin() as connection:
-        connection.execute(select(sessions.c.token).where(
-            sessions.c.token == digest(request.cookies[config.COOKIE]),
-        ).with_for_update()).first()
-        active = connection.execute(select(scans).where(
-            scans.c.owner == owner, scans.c.state.in_(["queued", "running"]),
-        ).limit(4)).mappings().all()
+    with workspace_write(owner, request.cookies[config.COOKIE]) as tx:
+        timestamp = now()
+        active = entities(tx, """
+            MATCH (s:SFScan {owner: $owner}) WHERE s.state IN ['queued', 'running']
+            RETURN s AS node LIMIT 4
+            """, owner=owner)
         existing = next((row for row in active if row["repo"] == repository and row["options"]["ai"] == body.ai), None)
         if existing:
             return scan_view(existing)
-        recent = connection.execute(select(scans.c.id).where(
-            scans.c.owner == owner, scans.c.created >= now() - 3600,
-        ).limit(12)).all()
-        if len(active) >= 3 or len(recent) >= 12:
+        recent = tx.run("""
+            MATCH (s:SFScan {owner: $owner}) WHERE s.created >= $since
+            WITH s LIMIT 12 RETURN count(s) AS total
+            """, owner=owner, since=timestamp - 3600).single()["total"]
+        if len(active) >= 3 or recent >= 12:
             raise HTTPException(429, "This workspace has reached its scan limit. Try again later.")
         row = {"id": str(uuid4()), "repo": repository, "owner": owner, "state": "queued",
-               "created": now(), "updated": now(), "options": {"ai": body.ai}, "result": None}
-        connection.execute(insert(scans).values(**row))
+               "created": timestamp, "updated": timestamp, "options": {"ai": body.ai}, "result": None}
+        tx.run("CREATE (s:SFScan) SET s = $row", row={**row, "options": encode(row["options"])}).consume()
     return scan_view(row)
 
 
 @app.get("/api/scans")
 def list_scans(request: Request):
     owner = owner_of(request)
-    with engine.connect() as connection:
-        rows = connection.execute(select(scans).where(scans.c.owner == owner).order_by(
-            scans.c.created.desc(), scans.c.id.desc(),
-        ).limit(60)).mappings()
-        return [scan_view(row) for row in rows]
+    with transaction() as tx:
+        rows = entities(tx, """
+            MATCH (s:SFScan {owner: $owner})
+            RETURN s AS node ORDER BY s.created DESC, s.id DESC LIMIT 60
+            """, owner=owner)
+    return [scan_view(row) for row in rows]
 
 
 def lookup(owner, scan_id):
-    with engine.connect() as connection:
-        row = connection.execute(select(scans).where(scans.c.id == scan_id, scans.c.owner == owner)).mappings().first()
+    with transaction() as tx:
+        row = find_scan(tx, owner, scan_id)
     if not row:
         raise HTTPException(404, "This scan is unavailable in your workspace.")
     return row
@@ -310,26 +338,28 @@ def publish_rubric(scan_id: str, body: RubricApproval, request: Request):
     if not set(expected).issubset(possible):
         raise HTTPException(422, "Only excluded criteria can be marked as expected capabilities.")
     updated = {**result, "quality": finalize(result["quality"], expected, body.note.strip())}
-    with engine.begin() as connection:
-        changed = connection.execute(update(scans).where(
-            scans.c.owner == owner, scans.c.id == scan_id, scans.c.state == "review",
-        ).values(state="complete", result=updated, updated=now()))
-    if changed.rowcount != 1:
-        return scan_view(lookup(owner, scan_id), details=True)
-    return scan_view({**row, "state": "complete", "result": updated, "updated": now()}, details=True)
+    with workspace_write(owner, request.cookies[config.COOKIE]) as tx:
+        changed = tx.run("""
+            MATCH (s:SFScan {owner: $owner, id: $id})
+            SET s.lock = coalesce(s.lock, 0) + 1
+            WITH s WHERE s.state = 'review'
+            SET s.state = 'complete', s.result = $result, s.updated = $now
+            RETURN s AS node
+            """, owner=owner, id=scan_id, result=encode(updated), now=now()).single()
+    return scan_view(entity(changed) if changed else lookup(owner, scan_id), details=True)
 
 
 @app.delete("/api/scans/{scan_id}", status_code=204)
 def delete_scan(scan_id: str, request: Request):
     owner = owner_of(request)
-    with engine.begin() as connection:
-        connection.execute(delete(scans).where(scans.c.owner == owner, scans.c.id == scan_id))
+    with workspace_write(owner, request.cookies[config.COOKIE]) as tx:
+        tx.run("MATCH (s:SFScan {owner: $owner, id: $id}) DELETE s", owner=owner, id=scan_id).consume()
     return Response(status_code=204)
 
 
 @app.get("/api/contributions")
 async def contributions(request: Request, language: str, label: str, page: int = Query(1, ge=1, le=10)):
-    owner_of(request)
+    await asyncio.to_thread(owner_of, request)
     if language not in CONTRIBUTION_LANGUAGES or label not in CONTRIBUTION_LABELS:
         raise HTTPException(422, "Choose a supported language and issue label.")
     try:
@@ -356,7 +386,8 @@ async def context_for(snapshot, body):
 
 @app.post("/api/scans/{scan_id}/context")
 async def scan_context(scan_id: str, body: ContextQuestion, request: Request):
-    row = lookup(owner_of(request), scan_id)
+    owner = await asyncio.to_thread(owner_of, request)
+    row = await asyncio.to_thread(lookup, owner, scan_id)
     if row["state"] not in {"complete", "review"}:
         raise HTTPException(409, "Context is available after indexing.")
     return await context_for(row["result"], body)
@@ -364,13 +395,14 @@ async def scan_context(scan_id: str, body: ContextQuestion, request: Request):
 
 @app.post("/api/sample/context")
 async def sample_context(body: ContextQuestion, request: Request):
-    owner_of(request)
+    await asyncio.to_thread(owner_of, request)
     return await context_for(compile_snapshot(SNAPSHOT), body)
 
 
 @app.get("/api/scans/{scan_id}/source")
 async def preview(scan_id: str, path: str, request: Request):
-    row = lookup(owner_of(request), scan_id)
+    owner = await asyncio.to_thread(owner_of, request)
+    row = await asyncio.to_thread(lookup, owner, scan_id)
     result = row["result"]
     if row["state"] not in {"complete", "review"} or path not in result["preview_paths"]:
         raise HTTPException(404, "This file is outside the analyzed source sample.")

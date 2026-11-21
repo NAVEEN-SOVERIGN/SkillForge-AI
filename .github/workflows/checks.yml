@@ -25,6 +25,18 @@ jobs:
       - run: npm audit --omit=dev
   service:
     runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5.26.27-community
+        env:
+          NEO4J_AUTH: none
+        ports:
+          - 17687:7687
+        options: >-
+          --health-cmd "cypher-shell -a bolt://localhost:7687 -u neo4j -p neo4j 'RETURN 1'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

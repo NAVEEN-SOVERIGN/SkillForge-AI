@@ -3,27 +3,32 @@ import asyncio
 import os
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from neo4j.exceptions import ServiceUnavailable
 
-TEMP = tempfile.TemporaryDirectory()
-os.environ["DATABASE_URL"] = "sqlite:///" + str(Path(TEMP.name) / "suite.db")
+# The product suite uses a dedicated local Neo4j instance with authentication disabled.
+os.environ["NEO4J_URI"] = "bolt://127.0.0.1:17687"
+os.environ["NEO4J_DATABASE"] = "neo4j"
+os.environ["NEO4J_PASSWORD"] = ""
 os.environ["APP_ENV"] = "test"
 os.environ["SCAN_WORKER_ENABLED"] = "false"
 os.environ["JUDGE_URL"] = ""
 os.environ["JUDGE_TOKEN"] = ""
 
 from skillforge import config
-from skillforge.db import engine
+from skillforge.db import close, now, provision, session, transaction
 from skillforge.decision_context import explain
 from skillforge.judge import matches
 from skillforge.main import app
+from skillforge.migrate import migrate
 from skillforge.problem_scoring import assess_submission, best_assessments, developer_index, next_problem
 from skillforge.problems import PROBLEMS
 from skillforge.sample import SNAPSHOT
-from skillforge.scanning import claim, compile_snapshot, perform
+from skillforge.scanning import LEASE_SECONDS, claim, compile_snapshot, finish, perform
 from skillforge.scoring import finalize
 
 ORIGIN = {"Origin": config.ORIGIN}
@@ -42,9 +47,22 @@ return <main><button onClick={() => setProgress(1)}>Go to bookmark</button></mai
 }"""}, "An offline ebook reader")
 
 
+def setUpModule():
+    migrate()
+    with transaction() as tx:
+        count = tx.run("MATCH (n) WHERE n:SFWorkspace OR n:SFSession OR n:SFScan OR n:SFAttempt OR n:SFProfile "
+                       "RETURN count(n) AS count").single()["count"]
+    if count:
+        raise RuntimeError("Start a fresh disposable Neo4j instance on port 17687 before running this suite.")
+
+
 def tearDownModule():
-    engine.dispose()
-    TEMP.cleanup()
+    try:
+        with transaction(write=True) as tx:
+            tx.run("MATCH (n) WHERE n:SFWorkspace OR n:SFSession OR n:SFScan OR n:SFAttempt OR n:SFProfile "
+                   "DELETE n").consume()
+    finally:
+        close()
 
 
 class GraphAndScoreTests(unittest.TestCase):
@@ -225,6 +243,43 @@ class WorkspaceTests(unittest.TestCase):
             owner.delete("/api/account", headers=ORIGIN).raise_for_status()
             self.assertEqual(owner.get("/api/scans/" + key).status_code, 404)
 
+    def test_workers_claim_once_and_stale_leases_cannot_finish(self):
+        with TestClient(app) as client:
+            client.get("/api/session").raise_for_status()
+            job = client.post("/api/scans", json={"repository": "owner/lease"}, headers=ORIGIN)
+            key = job.raise_for_status().json()["id"]
+            with ThreadPoolExecutor(max_workers=2) as workers:
+                claims = list(workers.map(lambda _: claim(), range(2)))
+            self.assertEqual(sum(result is not None for result in claims), 1)
+            first, old_lease = next(result for result in claims if result)
+            self.assertEqual(first["id"], key)
+            with transaction(write=True) as tx:
+                tx.run("MATCH (s:SFScan {id: $id}) SET s.updated = $expired",
+                       id=key, expired=now() - LEASE_SECONDS - 1).consume()
+            current, lease = claim()
+            self.assertEqual(current["id"], key)
+            self.assertNotEqual(lease, old_lease)
+            finish(key, old_lease, "failed", {"error": "stale"})
+            self.assertEqual(client.get("/api/scans/" + key).json()["state"], "running")
+            finish(key, lease, "failed", {"error": "current"})
+            self.assertEqual(client.get("/api/scans/" + key).json()["result"], {"error": "current"})
+
+    def test_neo4j_sessions_and_practice_attempts_survive_driver_restart(self):
+        from skillforge.practice import finish_attempt, reserve_attempt
+
+        token = provision()
+        owner = session(token)["owner"]
+        key = "fixture-attempt"
+        reserve_attempt(owner, token, key, "warehouse-reconciliation")
+        finish_attempt(owner, key, {"passed": 1, "total": 2})
+        close()
+        with TestClient(app) as client:
+            client.cookies.set(config.COOKIE, token)
+            self.assertEqual(client.get("/api/practice/attempts").raise_for_status().json()[0]["id"], key)
+            self.assertEqual(client.get("/api/practice/attempts").json()[0]["passed"], 1)
+            client.delete("/api/account", headers=ORIGIN).raise_for_status()
+        self.assertIsNone(session(token))
+
     def test_public_catalog_does_not_disclose_hidden_cases(self):
         with TestClient(app) as client:
             catalog = client.get("/api/practice/problems").json()
@@ -276,9 +331,13 @@ class WorkspaceTests(unittest.TestCase):
             }).raise_for_status().json()
             self.assertIsNone(unknown["answer"])
             self.assertEqual(unknown["confidence"], "insufficient")
-            with patch.dict(os.environ, {"NEO4J_PASSWORD": "fixture"}), patch(
-                "skillforge.decision_context.neo4j_paths", side_effect=ValueError,
-            ):
+            with transaction() as tx:
+                before = tx.run("MATCH (q:SkillForgeQuestion) RETURN count(q)").single()[0]
+            graph = client.post(route, headers=ORIGIN, json={**query, "neo4j": True}).raise_for_status().json()
+            self.assertEqual(graph, {**current, "mode": "neo4j"})
+            with transaction() as tx:
+                self.assertEqual(tx.run("MATCH (q:SkillForgeQuestion) RETURN count(q)").single()[0], before)
+            with patch("skillforge.decision_context.neo4j_paths", side_effect=ServiceUnavailable):
                 fallback = client.post(route, headers=ORIGIN, json={**query, "neo4j": True}).json()
             self.assertEqual(fallback, {**current, "mode": "fallback"})
 

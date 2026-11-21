@@ -5,11 +5,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCTION = os.getenv("APP_ENV") == "production"
 ORIGIN = (os.getenv("APP_ORIGIN") or os.getenv("RENDER_EXTERNAL_URL") or "http://localhost:5173").rstrip("/")
-DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///" + str(ROOT / ".skillforge.db")
-if DATABASE_URL.startswith(("postgresql://", "postgres://")):
-    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL.split("://", 1)[1]
-if PRODUCTION and (not ORIGIN.startswith("https://") or not DATABASE_URL.startswith("postgresql+psycopg://")):
-    raise RuntimeError("Production requires an HTTPS APP_ORIGIN and a PostgreSQL DATABASE_URL.")
+NEO4J_URI = os.getenv("NEO4J_URI") or "bolt://127.0.0.1:7687"
+NEO4J_USERNAME = os.getenv("NEO4J_USERNAME") or "neo4j"
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+NEO4J_DATABASE = os.getenv("NEO4J_DATABASE") or "neo4j"
+if PRODUCTION and not ORIGIN.startswith("https://"):
+    raise RuntimeError("Production requires an HTTPS APP_ORIGIN or RENDER_EXTERNAL_URL.")
+if PRODUCTION and (not NEO4J_URI.startswith(("neo4j+s://", "bolt+s://")) or not NEO4J_PASSWORD):
+    raise RuntimeError("Production requires a TLS Neo4j URI and NEO4J_PASSWORD.")
 GITHUB_TOKEN = os.getenv("GITHUB_API_TOKEN", "")
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
