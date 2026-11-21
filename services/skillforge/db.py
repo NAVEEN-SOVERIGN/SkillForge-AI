@@ -3,7 +3,20 @@ import hashlib
 import secrets
 import time
 
-from sqlalchemy import JSON, Column, Index, Integer, MetaData, String, Table, create_engine, delete, insert, select, update
+from sqlalchemy import (
+    JSON,
+    Column,
+    Index,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    delete,
+    insert,
+    select,
+    update,
+)
 
 from .config import DATABASE_URL
 
@@ -27,6 +40,7 @@ attempts = Table(
 )
 profiles = Table(
     "profiles", metadata, Column("owner", String(110), primary_key=True), Column("data", JSON, nullable=False),
+    Column("revision", Integer, nullable=False),
 )
 Index("ix_scans_owner_created", scans.c.owner, scans.c.created)
 Index("ix_scans_queue", scans.c.state, scans.c.updated)
@@ -67,7 +81,7 @@ def session(token):
 def touch(token, current):
     if current and not current["github"] and current["expires"] < now() + 7000:
         with engine.begin() as connection:
-            connection.execute(update(sessions).where(sessions.c.token == digest(token)).values(
+            connection.execute(update(sessions).where(sessions.c.token == digest(token), sessions.c.expires > now()).values(
                 expires=now() + 7200,
             ))
 

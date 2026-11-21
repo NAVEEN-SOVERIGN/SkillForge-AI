@@ -4,15 +4,16 @@ import type { FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, ChartBar, CheckCircle, Code, GitBranch, GithubLogo,
-  Graph, ListChecks, Plus, Sparkle, Trash, X,
+  Briefcase, Graph, ListChecks, Plus, Sparkle, Trash, X,
 } from '@phosphor-icons/react'
 import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
 import { CodeGraph } from './Graph'
 import { Practice } from './Practice'
+import { Career } from './Career'
 import './styles.css'
 
-type View = 'workspace' | 'rankings' | 'practice'
+type View = 'workspace' | 'rankings' | 'practice' | 'career'
 type Tab = 'graph' | 'quality' | 'history'
 
 function App() {
@@ -147,6 +148,7 @@ function App() {
           <button className={view === 'workspace' ? 'nav-active' : ''} onClick={() => setView('workspace')}><Graph size={18} /> Workspace</button>
           <button className={view === 'rankings' ? 'nav-active' : ''} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
           <button className={view === 'practice' ? 'nav-active' : ''} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
+          <button className={view === 'career' ? 'nav-active' : ''} onClick={() => setView('career')}><Briefcase size={18} /> Career</button>
         </nav>
         <button className="top-account" onClick={() => setSettings(!settings)} aria-expanded={settings}>
           <GithubLogo size={18} /><span>{session?.login ?? 'Account'}</span>
@@ -231,7 +233,7 @@ function App() {
           </section>
         </div>
       </> : view === 'rankings' ? <Rankings scans={scans} onOpen={id => openScan(id, 'quality')} onWorkspace={() => setView('workspace')} />
-        : <Practice enabled={!!session?.judge} initialProblem={practiceFocus} />}
+        : view === 'practice' ? <Practice enabled={!!session?.judge} initialProblem={practiceFocus} /> : <Career scans={scans} />}
     </main>
     <footer><span>SkillForge</span><span>Repository analysis and applied practice</span></footer>
     {picker && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Choose a GitHub repository">

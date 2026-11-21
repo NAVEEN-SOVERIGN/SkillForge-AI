@@ -194,7 +194,23 @@ footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content: space-betwe
 .solution { display: block; width: 100%; min-height: 260px; margin: 12px 0; resize: vertical; border: 1px solid #334f40; padding: 13px; border-radius: 5px; color: #ebf3e9; background: #202d27; font: 13px/1.65 ui-monospace, Consolas, monospace; tab-size: 4; }
 .case-row { border-top: 1px solid var(--rule); padding: 8px 0; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 5px; }
 .case-row svg { color: var(--green); }
+.career-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+.career h2 { font-size: clamp(16px,2.2vw,22px); letter-spacing: -.026em; }
+.career h3 { font-size: 15px; overflow-wrap: anywhere; }
+.career .panel > p { margin-top: 6px; color: var(--muted); }
+.career-status { display: flex; align-items: center; gap: 6px; color: var(--green); }
+.form-stack { display: grid; align-content: start; justify-items: start; gap: 10px; }
+.form-stack label { display: grid; width: 100%; gap: 4px; font-size: 13px; font-weight: 650; }
+.form-stack small { color: var(--muted); }
+.form-stack input, .form-stack select, .form-stack textarea { min-width: 0; width: 100%; padding: 8px; border: 1px solid var(--rule); border-radius: 4px; background: #f8faf5; color: var(--ink); }
+.form-stack textarea { resize: vertical; }
+.skill-list { margin-top: 10px; }
+.skill-list > div, .action-row, .evidence-row { padding: 7px 0; border-top: 1px solid var(--rule); }
+.action-row:first-of-type, .evidence-row:first-of-type { margin-top: 10px; }
+.plan-actions details { margin-top: 10px; font-size: 13px; }
+.evidence-row p:last-child { overflow-wrap: anywhere; }
 @media (max-width: 680px) {
   .practice-grid { grid-template-columns: minmax(0,1fr); gap: 13px; }
+  .career-grid { grid-template-columns: minmax(0,1fr); }
   .practice .panel { padding: 12px; }
 }

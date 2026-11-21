@@ -14,9 +14,10 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, select
 
 from . import config
+from .career import router as career_router
 from .db import attempts, digest, engine, metadata, now, profiles, provision, scans, session, sessions, touch
 from .github import GitHubError, api, client, public_repositories, read_source, repo_name
 from .practice import router as practice_router
@@ -285,6 +286,7 @@ def sample_source(path: str):
 
 
 app.include_router(practice_router)
+app.include_router(career_router)
 
 
 if (DIST / "assets").is_dir():
