@@ -357,3 +357,34 @@ class WorkspaceTests(unittest.TestCase):
             self.assertEqual(other.post(route, json={"question": "Why?"}, headers=ORIGIN).status_code, 404)
             self.assertEqual(owner.post(route, json={"question": "Why?"}, headers=ORIGIN).status_code, 409)
             owner.delete(route.removesuffix("/context"), headers=ORIGIN).raise_for_status()
+
+    def test_contribution_roadmap_progress_and_public_activity_are_owner_scoped(self):
+        route = "/api/career/contribution-roadmap"
+        token = provision("github:93844", "fixture-contributor")
+        with TestClient(app) as owner, TestClient(app) as other:
+            owner.cookies.set(config.COOKIE, token)
+            other.get("/api/session").raise_for_status()
+            initial = owner.get(route).raise_for_status().json()
+            self.assertEqual(len(initial["projects"]), 3)
+            project = initial["projects"][0]
+            task = project["tasks"][0]
+            changed = owner.put(route, headers=ORIGIN, json={
+                "project": project["id"], "task": task["id"], "completed": True,
+            }).raise_for_status().json()
+            self.assertEqual(changed["selected"], project["id"])
+            self.assertEqual(changed["projects"][0]["completed"], [task["id"]])
+            self.assertEqual(changed["steps"][0]["title"], project["tasks"][1]["title"])
+            self.assertEqual(owner.get(route).json(), changed)
+            self.assertIsNone(other.get(route).json()["selected"])
+            self.assertEqual(other.post(route + "/github", headers=ORIGIN).status_code, 403)
+
+            citation = {"repo": "example/project", "kind": "merged pull request", "title": "Improve project docs",
+                        "draft": False, "date": "2026-11-20T00:00:00Z", "url": "https://github.com/example/project/pull/3"}
+            with patch("skillforge.career.contribution_activity", return_value={"items": [citation], "partial": False}) as fetch:
+                refreshed = owner.post(route + "/github", headers=ORIGIN).raise_for_status().json()
+                fetch.assert_awaited_once_with("fixture-contributor")
+            self.assertEqual(refreshed["steps"][0]["citation"], citation)
+            self.assertIsNone(other.get(route).json()["activity"])
+            removed = owner.delete(route + "/github", headers=ORIGIN).raise_for_status().json()
+            self.assertIsNone(removed["activity"])
+            self.assertEqual(removed["projects"][0]["completed"], [task["id"]])

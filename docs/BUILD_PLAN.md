@@ -34,6 +34,10 @@ Ship one React and TypeScript application with one same-origin FastAPI API, scal
 
 The pilot samples up to 12 closed PRs on the default branch, 15 issue-list entries, 12 commits, four design documents and the changed-file lists and discussion for three merged PRs. GitHub lists, references and date limits can leave historical gaps. The temporary projection recognizes explicit references and successive numeric or Boolean assignments recorded in titles for the same named setting. Other silent overrides, missing rename metadata and exact default-branch ancestry for merged PRs remain outside the pilot.
 
+## R13 contribution roadmap walkthrough
+
+Open **Open Source → Projects and roadmap**. Choose a brief and complete one milestone. The roadmap should move to the next unchecked milestone and retain progress after reload. Change the target role and weekly hours in Career to change recommendations and project time estimates. In a GitHub-connected workspace, import public activity and verify a PR or issue citation. Remove imported activity and verify that the associated recommendation disappears. A separate session must see its own progress. GitHub import uses a bounded sample of authored public PRs and issues alongside SkillForge repository and assessment evidence.
+
 ## Release gates
 
 - **Correctness and security.** Pass locked dependency installs, frontend type checks and production build, API lint and tests, dependency and secret scans, migration tests and browser checks. Verify identity isolation, GitHub connection revocation, graph edge resolution, rubric reproducibility, citation abstention, and inert rendering of user and repository text. Check that import networks are limited to approved GitHub hosts, including on redirect. Confirm judge isolation and inspect output for hidden tests or credentials. Review retention and privacy disclosures before public onboarding.

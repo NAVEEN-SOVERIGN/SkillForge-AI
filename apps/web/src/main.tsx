@@ -23,6 +23,7 @@ type Tab = 'graph' | 'quality' | 'history'
 
 function App() {
   const [view, setView] = useState<View>('workspace')
+  const [focusRoadmap, setFocusRoadmap] = useState(false)
   const [tab, setTab] = useState<Tab>('graph')
   const [session, setSession] = useState<Session | null>(null)
   const [scans, setScans] = useState<Scan[]>([])
@@ -162,7 +163,7 @@ function App() {
           <button aria-current={view === 'rankings' ? 'page' : undefined} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
           <button aria-current={view === 'practice' ? 'page' : undefined} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
           <button aria-current={view === 'opensource' ? 'page' : undefined} onClick={() => setView('opensource')}><GithubLogo size={18} /> Open Source</button>
-          <button aria-current={view === 'career' ? 'page' : undefined} onClick={() => setView('career')}><Briefcase size={18} /> Career</button>
+          <button aria-current={view === 'career' ? 'page' : undefined} onClick={() => { setFocusRoadmap(false); setView('career') }}><Briefcase size={18} /> Career</button>
         </nav>
         <button className="top-account" onClick={() => setSettings(!settings)} aria-expanded={settings}>
           <GithubLogo size={18} /><span>{session?.login ?? 'Account'}</span>
@@ -249,9 +250,13 @@ function App() {
           </section>
         </div>
       </> : view === 'rankings' ? <Rankings scans={scans} onOpen={id => openScan(id, 'quality')} onWorkspace={() => setView('workspace')} />
-        : view === 'opensource' ? <OpenSource onExplore={repository => {
+        : view === 'opensource' ? <OpenSource onRoadmap={() => {
+          setFocusRoadmap(true); setView('career')
+        }} onExplore={repository => {
           setRepo(repository); setConsent(false); openScan(null); window.scrollTo(0, 0)
-        }} /> : view === 'practice' ? <Practice enabled={!!session?.judge} initialProblem={practiceFocus} /> : <Career scans={scans} />}
+        }} /> : view === 'practice' ? <Practice enabled={!!session?.judge} initialProblem={practiceFocus} /> : <Career scans={scans} session={session} focusRoadmap={focusRoadmap}
+          onDiscover={() => { setView('opensource'); window.scrollTo(0, 0) }}
+          onPractice={() => { setPracticeFocus(null); setView('practice'); window.scrollTo(0, 0) }} />}
     </main>
     <footer><span>SkillForge</span><span>Repository analysis and applied practice</span></footer>
     {picker && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Choose a GitHub repository">
