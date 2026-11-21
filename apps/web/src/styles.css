@@ -144,7 +144,7 @@ body #root > footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content
 }
 @media (max-width: 780px) {
   .top-inner { padding: 0 12px; gap: 10px; flex-wrap: wrap; }
-  .topbar nav { flex: 1 0 100%; order: 2; gap: clamp(3px,2vw,12px); }
+  .topbar nav { flex: 1 0 100%; order: 2; flex-wrap: wrap; gap: 0 clamp(3px,2vw,12px); }
   .topbar nav button { padding: 5px 3px; min-height: 36px; font-size: 12px; gap: 4px; }
   .topbar nav button svg { width: 14px; }
   .shell { padding: 0 13px 42px; }

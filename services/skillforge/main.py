@@ -5,12 +5,13 @@ import hashlib
 import os
 import secrets
 from contextlib import asynccontextmanager, suppress
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -19,7 +20,18 @@ from sqlalchemy import delete, insert, select, update
 from . import config
 from .career import router as career_router
 from .db import attempts, digest, engine, now, profiles, provision, scans, session, sessions, touch
-from .github import GitHubError, api, client, public_repositories, read_source, repo_name
+from .decision_context import explain
+from .github import (
+    CONTRIBUTION_LABELS,
+    CONTRIBUTION_LANGUAGES,
+    GitHubError,
+    api,
+    client,
+    contribution_issues,
+    public_repositories,
+    read_source,
+    repo_name,
+)
 from .migrate import migrate, require_current_schema
 from .practice import router as practice_router
 from .review import enabled as ai_enabled
@@ -312,6 +324,47 @@ def delete_scan(scan_id: str, request: Request):
     with engine.begin() as connection:
         connection.execute(delete(scans).where(scans.c.owner == owner, scans.c.id == scan_id))
     return Response(status_code=204)
+
+
+@app.get("/api/contributions")
+async def contributions(request: Request, language: str, label: str, page: int = Query(1, ge=1, le=10)):
+    owner_of(request)
+    if language not in CONTRIBUTION_LANGUAGES or label not in CONTRIBUTION_LABELS:
+        raise HTTPException(422, "Choose a supported language and issue label.")
+    try:
+        return await contribution_issues(language, label, page)
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, "GitHub issue search is temporarily unavailable.") from exc
+
+
+class ContextQuestion(BaseModel):
+    question: str = Field(default="", max_length=200)
+    path: str | None = Field(default=None, max_length=400)
+    through: date | None = None
+    neo4j: bool = False
+
+
+async def context_for(snapshot, body):
+    if not body.question.strip() and not body.path:
+        raise HTTPException(422, "Enter a question or select a finding with a file.")
+    if body.path and body.path not in snapshot["preview_paths"]:
+        raise HTTPException(422, "This file is outside the analyzed source sample.")
+    return await explain(snapshot, body.question, body.path, body.through.isoformat() if body.through else None,
+                         body.neo4j)
+
+
+@app.post("/api/scans/{scan_id}/context")
+async def scan_context(scan_id: str, body: ContextQuestion, request: Request):
+    row = lookup(owner_of(request), scan_id)
+    if row["state"] not in {"complete", "review"}:
+        raise HTTPException(409, "Context is available after indexing.")
+    return await context_for(row["result"], body)
+
+
+@app.post("/api/sample/context")
+async def sample_context(body: ContextQuestion, request: Request):
+    owner_of(request)
+    return await context_for(compile_snapshot(SNAPSHOT), body)
 
 
 @app.get("/api/scans/{scan_id}/source")

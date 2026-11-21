@@ -1,3 +1,4 @@
+import { DecisionHistory } from './DecisionHistory'
 
 import { ArrowDown, ArrowUpRight, CheckCircle, CircleDashed, MagnifyingGlass, Sparkle, WarningCircle } from '@phosphor-icons/react'
 import { useState } from 'react'
@@ -28,11 +29,12 @@ function Metric({ name, value, detail, percent, tone }: {
   </article>
 }
 
-export function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {
-  snapshot: Snapshot; previous?: Scan; comparable: Scan[]; onCompare: (scan?: Scan) => void; onPractice: (id: string) => void
+export function Scorecard({ snapshot, scanId, previous, comparable, onCompare, onPractice }: {
+  snapshot: Snapshot; scanId: string | null; previous?: Scan; comparable: Scan[]; onCompare: (scan?: Scan) => void; onPractice: (id: string) => void
 }) {
   const quality = snapshot.quality
   const [filter, setFilter] = useState<Filter>('review')
+  const [contextFinding, setContextFinding] = useState<Finding>()
   const delta = previous?.summary?.score != null && quality.score != null ? quality.score - previous.summary.score : null
   const ordered = [...quality.findings].sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical') ||
     Number(a.state === 'met') - Number(b.state === 'met') || lost(b) - lost(a))
@@ -77,8 +79,8 @@ export function Scorecard({ snapshot, previous, comparable, onCompare, onPractic
         </div>
       </div>
       <footer className="score-sheet-foot">
-        <span className="mono">{quality.version}</span>
-        <a href="#score-evidence" onClick={() => setFilter('review')}>Review evidence <ArrowDown size={14} /></a>
+        <span className="mono">{quality.version} · {snapshot.revision.slice(0, 12)}</span>
+        <a href="#score-evidence" onClick={() => { setFilter('review'); setContextFinding(undefined) }}>Review evidence <ArrowDown size={14} /></a>
       </footer>
     </section>
 
@@ -104,9 +106,9 @@ export function Scorecard({ snapshot, previous, comparable, onCompare, onPractic
       <div className="score-evidence-head">
         <div><h3>Evidence and next steps</h3><p>Findings from the sampled revision.</p></div>
         <div className="score-filters" aria-label="Filter findings">
-          <button className="button compact" aria-pressed={filter === 'review'} onClick={() => setFilter('review')}>Needs review <span>{needsReview.length}</span></button>
-          <button className="button compact" aria-pressed={filter === 'unmeasured'} onClick={() => setFilter('unmeasured')}>Unmeasured <span>{notMeasured.length}</span></button>
-          <button className="button compact" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All <span>{ordered.length}</span></button>
+          <button className="button compact" aria-pressed={filter === 'review'} onClick={() => { setFilter('review'); setContextFinding(undefined) }}>Needs review <span>{needsReview.length}</span></button>
+          <button className="button compact" aria-pressed={filter === 'unmeasured'} onClick={() => { setFilter('unmeasured'); setContextFinding(undefined) }}>Unmeasured <span>{notMeasured.length}</span></button>
+          <button className="button compact" aria-pressed={filter === 'all'} onClick={() => { setFilter('all'); setContextFinding(undefined) }}>All <span>{ordered.length}</span></button>
         </div>
       </div>
       {!rows.length && <p className="score-evidence-empty">No findings match this filter.</p>}
@@ -117,6 +119,11 @@ export function Scorecard({ snapshot, previous, comparable, onCompare, onPractic
           {finding.path && <small className="mono word-wrap">{finding.url && !snapshot.sample
             ? <a href={finding.url} target="_blank" rel="noreferrer">{finding.path}:{finding.line} <ArrowUpRight size={13} /></a>
             : finding.path + ':' + finding.line}</small>}
+          {finding.path && snapshot.preview_paths.includes(finding.path) &&
+            <button className="text-button" aria-expanded={contextFinding === finding}
+              onClick={() => setContextFinding(contextFinding === finding ? undefined : finding)}>
+              Inspect file history
+            </button>}
           {finding.state === 'review' && ['Performance hygiene', 'Performance'].includes(finding.dimension) &&
             <button className="text-button" onClick={() => onPractice('load-monitor')}>Practice efficient processing</button>}
           {finding.state === 'review' && ['Test files are present', 'Assertions in sampled tests'].includes(finding.title) &&
@@ -124,6 +131,9 @@ export function Scorecard({ snapshot, previous, comparable, onCompare, onPractic
         </div>
         <div className="evidence-points"><Status finding={finding} />
           {finding.points != null && <small>{finding.points}/{finding.max} points</small>}</div>
+        {contextFinding === finding && finding.path && <div className="finding-history">
+          <DecisionHistory snapshot={snapshot} scanId={scanId} path={finding.path} timeline={false} />
+        </div>}
       </article>)}
     </section>
 
