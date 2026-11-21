@@ -231,7 +231,7 @@ function App() {
               {summary.retryAt && <p>Try after {new Date(summary.retryAt * 1000).toLocaleTimeString()}.</p>}
               <button className="button" onClick={() => { setRepo(selectedRow!.repo); document.getElementById('repository')?.focus() }}>Prepare another scan</button></div>}
             {snapshot && <>
-              <div className="tabbar" aria-label="Repository views">
+              <div className="tabbar" role="group" aria-label="Repository views">
                 <button aria-pressed={tab === 'graph'} onClick={() => setTab('graph')}><Graph size={17} /> Code graph</button>
                 <button aria-pressed={tab === 'quality'} onClick={() => setTab('quality')}><ListChecks size={17} /> Quality score</button>
                 <button aria-pressed={tab === 'history'} onClick={() => setTab('history')}><GitBranch size={17} /> Decision history</button>

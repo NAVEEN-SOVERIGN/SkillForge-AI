@@ -103,7 +103,7 @@ export function Scorecard({ snapshot, previous, comparable, onCompare, onPractic
     <section className="panel findings" id="score-evidence">
       <div className="score-evidence-head">
         <div><h3>Evidence and next steps</h3><p>Findings from the sampled revision.</p></div>
-        <div className="score-filters" aria-label="Filter findings">
+        <div className="score-filters" role="group" aria-label="Filter findings">
           <button className="button compact" aria-pressed={filter === 'review'} onClick={() => setFilter('review')}>Needs review <span>{needsReview.length}</span></button>
           <button className="button compact" aria-pressed={filter === 'unmeasured'} onClick={() => setFilter('unmeasured')}>Unmeasured <span>{notMeasured.length}</span></button>
           <button className="button compact" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All <span>{ordered.length}</span></button>

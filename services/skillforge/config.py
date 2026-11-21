@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCTION = os.getenv("APP_ENV") == "production"
-ORIGIN = os.getenv("APP_ORIGIN", "http://localhost:5173").rstrip("/")
+ORIGIN = (os.getenv("APP_ORIGIN") or os.getenv("RENDER_EXTERNAL_URL") or "http://localhost:5173").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///" + str(ROOT / ".skillforge.db")
 if DATABASE_URL.startswith(("postgresql://", "postgres://")):
     DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL.split("://", 1)[1]

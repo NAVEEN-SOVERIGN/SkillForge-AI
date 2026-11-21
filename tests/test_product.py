@@ -148,11 +148,27 @@ class WorkspaceTests(unittest.TestCase):
             rejected = client.post("/api/scans", json={"repository": "owner/repo"})
             self.assertEqual(rejected.status_code, 403)
             for response in (health, rejected):
-                self.assertEqual(response.headers["strict-transport-security"], "max-age=31536000")
+                self.assertEqual(response.headers["strict-transport-security"], "max-age=63072000; includeSubDomains")
                 self.assertEqual(response.headers["x-content-type-options"], "nosniff")
                 self.assertEqual(response.headers["cross-origin-resource-policy"], "same-origin")
                 self.assertEqual(response.headers["cache-control"], "no-store")
                 self.assertIn("default-src 'none'", response.headers["content-security-policy"])
+
+    def test_public_metadata_matches_the_configured_origin(self):
+        origin = "https://skillforge.example"
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            (dist / "index.html").write_text("<html><head><!-- public-page-urls --></head></html>", encoding="utf-8")
+            card = config.ROOT / "apps" / "web" / "public" / "share-card.png"
+            (dist / "share-card.png").write_bytes(card.read_bytes())
+            with TestClient(app) as client, patch.object(config, "ORIGIN", origin), patch("skillforge.main.DIST", dist):
+                html = client.get("/").text
+                self.assertIn(f'<link rel="canonical" href="{origin}/">', html)
+                self.assertIn(f'<meta property="og:image" content="{origin}/share-card.png">', html)
+                self.assertIn(f"Sitemap: {origin}/sitemap.xml", client.get("/robots.txt").text)
+                self.assertIn(f"<loc>{origin}/</loc>", client.get("/sitemap.xml").text)
+                self.assertTrue(client.get("/share-card.png").content.startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertEqual(client.head("/robots.txt").status_code, 200)
 
     def test_scan_publishes_a_score_only_after_rubric_approval(self):
         with TestClient(app) as owner, TestClient(app) as other:

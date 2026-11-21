@@ -240,11 +240,11 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
     </section>}
     <div className="graph-heading">
       <div>
-        <div className="graph-crumb" aria-label="Graph location">
+        <nav className="graph-crumb" aria-label="Graph location">
           {selected || scope ? <button className="text-button" onClick={() => resetScope(selected ? scope : parentScope(scope))}>
             <ArrowLeft size={15} /> {selected ? 'Back to overview' : 'Up one level'}</button> : <span><Graph size={16} /> Repository overview</span>}
           {scope && <span>{scopeName(scope)}</span>}
-        </div>
+        </nav>
         <h3 tabIndex={-1} ref={canvasTitle}>{selected?.label ?? (scope ? scopeName(scope) : 'Repository structure')}</h3>
         <p>{selected ? 'Direct connections around this node' : 'Select a folder to drill down, or search for a specific node.'}</p>
       </div>
@@ -288,7 +288,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       {edgeDetail || [snapshot.graph.unresolved ? snapshot.graph.unresolved + ' connections could not be resolved from the source sample' : '',
         snapshot.graph.limited ? 'Graph index limit reached' : ''].filter(Boolean).join(' · ')}
     </div>}
-    {!selected && <div className="graph-shortcuts" aria-label="Nodes in this view">
+    {!selected && <div className="graph-shortcuts" role="group" aria-label="Nodes in this view">
       {overview.nodes.map(node => <button key={node.id} onClick={() => selectNode(node)}>
         {node.kind === 'folder' ? <FolderSimple size={15} /> : <ArrowRight size={14} />} {node.label}
       </button>)}

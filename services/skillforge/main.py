@@ -5,13 +5,14 @@ import hashlib
 import os
 import secrets
 from contextlib import asynccontextmanager, suppress
+from html import escape
 from pathlib import Path
 from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, insert, select, update
@@ -67,7 +68,7 @@ async def boundaries(request, call_next):
     if is_api:
         response.headers["Cache-Control"] = "no-store"
     if config.PRODUCTION:
-        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = (
@@ -348,9 +349,42 @@ if (DIST / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
 
 
-@app.get("/")
+@app.api_route("/robots.txt", methods=["GET", "HEAD"])
+def robots():
+    return PlainTextResponse(f"User-agent: *\nDisallow: /api/\nSitemap: {config.ORIGIN}/sitemap.xml\n")
+
+
+@app.api_route("/sitemap.xml", methods=["GET", "HEAD"])
+def sitemap():
+    return Response(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"  <url><loc>{escape(config.ORIGIN)}/</loc></url>\n"
+        "</urlset>\n",
+        media_type="application/xml",
+    )
+
+
+@app.api_route("/share-card.png", methods=["GET", "HEAD"])
+def share_card():
+    image = DIST / "share-card.png"
+    if not image.is_file():
+        raise HTTPException(404, "Build the web application first.")
+    return FileResponse(image, media_type="image/png")
+
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def index():
     index_file = Path(DIST / "index.html")
     if not index_file.is_file():
         raise HTTPException(404, "Start the Vite development server or build the web application.")
-    return FileResponse(index_file, media_type="text/html")
+    canonical = escape(config.ORIGIN + "/", quote=True)
+    metadata = (
+        f'<link rel="canonical" href="{canonical}">\n'
+        f'<meta property="og:url" content="{canonical}">\n'
+        f'<meta property="og:image" content="{canonical}share-card.png">\n'
+        '<meta property="og:image:width" content="1200">\n'
+        '<meta property="og:image:height" content="630">\n'
+        '<meta property="og:image:alt" content="SkillForge repository graphs and engineering scorecards">'
+    )
+    return HTMLResponse(index_file.read_text(encoding="utf-8").replace("<!-- public-page-urls -->", metadata, 1))

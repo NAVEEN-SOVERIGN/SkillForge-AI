@@ -1,12 +1,11 @@
 
-"""Start the compiled SkillForge app and API together on Windows."""
+"""Start the compiled SkillForge app and API together on the local machine."""
 
 import argparse
 import asyncio
 import errno
 import hashlib
 import json
-import msvcrt
 import os
 import re
 import shutil
@@ -29,6 +28,7 @@ STATE = ROOT / ".skillforge-local"
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 PORT_CHOICES = 20
+WINDOWS = os.name == "nt"
 
 
 def options():
@@ -48,8 +48,15 @@ def checkout_lock():
     STATE.mkdir(exist_ok=True)
     with (STATE / "launcher.lock").open("a+b") as lock:
         try:
-            lock.seek(0)
-            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            if WINDOWS:
+                import msvcrt
+
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             raise RuntimeError("This checkout already has an active launcher. Stop it before starting another.") from exc
         yield
@@ -60,7 +67,8 @@ def reserve_port(explicit):
     for port in choices:
         reservation = socket.socket()
         try:
-            reservation.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            if WINDOWS:
+                reservation.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             reservation.bind((HOST, port))
         except OSError as exc:
             reservation.close()
@@ -73,7 +81,8 @@ def reserve_port(explicit):
 
 
 def prepare_web(reinstall):
-    node, npm = shutil.which("node.exe"), shutil.which("npm.cmd")
+    node = shutil.which("node.exe" if WINDOWS else "node")
+    npm = shutil.which("npm.cmd" if WINDOWS else "npm")
     if not node or not npm:
         raise RuntimeError("Node.js and npm must be available on PATH. Use Node.js 22.12 or newer.")
     version = subprocess.check_output([node, "--version"], text=True, timeout=10).strip()
@@ -86,7 +95,9 @@ def prepare_web(reinstall):
     files = [WEB / "package.json", WEB / "package-lock.json"]
     identity = hashlib.sha256(f"{version}\n{npm_version}".encode() + b"".join(path.read_bytes() for path in files)).hexdigest()
     cached = stamp.is_file() and stamp.read_text(encoding="utf-8", errors="replace") == identity
-    tools = [installed / ".bin" / "vite.cmd", installed / ".bin" / "tsc.cmd", installed / ".package-lock.json"]
+    suffix = ".cmd" if WINDOWS else ""
+    tools = [installed / ".bin" / ("vite" + suffix), installed / ".bin" / ("tsc" + suffix),
+             installed / ".package-lock.json"]
     if reinstall or not cached or not all(path.is_file() for path in tools):
         print("Installing web dependencies from the lockfile...", flush=True)
         try:

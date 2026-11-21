@@ -1,11 +1,11 @@
 
 # Running SkillForge
 
-## Windows launcher
+## Windows and macOS launchers
 
-Double-click [Run-SkillForge.bat](../Run-SkillForge.bat), or run it from a terminal. It checks Node.js and npm, uses uv to prepare Python 3.12 and the locked API dependencies, and installs the locked web dependencies when needed. The first run may require internet access. It rebuilds the website, serves it with the API at a single loopback URL, and opens the browser after verifying the API, database and web build. Keep the terminal open while using the app and press Ctrl+C to stop it.
+Double-click [Run-SkillForge.bat](../Run-SkillForge.bat) on Windows or [Run-SkillForge.command](../Run-SkillForge.command) on macOS. The launcher checks Node.js and npm, uses uv to prepare Python 3.12 and the locked API dependencies, and installs the locked web dependencies when needed. The first run may require internet access. It rebuilds the website, serves it with the API at a single loopback URL, and opens the browser after verifying the API, database and web build. Keep the terminal open while using the app and press Ctrl+C to stop it.
 
-The launcher tries port 8765 first and then checks the next 19 ports. In PowerShell, use `.\Run-SkillForge.bat --port 8765` to require a specific port. Add `--no-browser` to print the URL only, `--check` to verify startup with a temporary database and stop, or `--reinstall` to repair web dependencies.
+The launcher tries port 8765 first and then checks the next 19 ports. In PowerShell, run `.\Run-SkillForge.bat`; in macOS Terminal run `./Run-SkillForge.command`. Both accept `--port 8765` to require a specific port, `--no-browser` to print the URL only, `--check` to verify startup with a temporary database and stop, and `--reinstall` to repair web dependencies. If a download or file copy removed the macOS executable permission, restore it with `chmod +x Run-SkillForge.command`.
 
 Local data is saved in the ignored `.skillforge.db` file. For optional GitHub, Gemini or judge settings, copy `.env.example` to `.env.local` and fill in the integrations you want to use. The launcher reads `.env.local` and sets the origin, local SQLite database, scan worker and GitHub callback for the current run. If you use GitHub sign-in, pin the port and register the callback printed by the launcher. The practice catalog works locally and code submissions become available when you configure a compatible isolated evaluator.
 
@@ -32,6 +32,8 @@ Open [the local workspace](http://localhost:5173/). The seeded example, public U
 For optional integrations, copy `.env.example` to an ignored `.env` at the repo root. From `services`, add `--env-file ../.env` to the `uv run` arguments.
 
 ## Staging deployment
+
+The [Render Blueprint](../render.yaml) creates a free web service and a free PostgreSQL database in one region. The web service uses Render’s assigned public URL, runs the initial migration before listening, and includes the scan worker. Render’s free database expires after 30 days. Use persistent compute and a separately deployed worker for a long-running environment. [Render free-plan limits](https://render.com/docs/free)
 
 1. Build the root Dockerfile. Deploy the API and static web app behind one HTTPS reverse proxy. Set `APP_ORIGIN` to the public URL and use PostgreSQL over TLS. Apply a request size cap, per-IP limits for session creation and imports, and an API timeout longer than the evaluator request timeout.
 2. Run `python -m skillforge.migrate` as a one-off schema task with a privileged database role. Run the API and scan worker with a separate role that has table access. The production API verifies the schema revision at startup.
