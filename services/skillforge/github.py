@@ -168,32 +168,9 @@ async def get_snapshot(repo):
                     aliases[path] = {"base": base, "paths": path_map}
             except (GitHubError, httpx.HTTPError, ValueError, AttributeError):
                 continue
-        history = []
-        history_available = False
-        try:
-            pulls = await api(http, f"/repos/{repo}/pulls", {"state": "all", "per_page": 12}, limit=1_200_000)
-            history = [
-                {"id": "pr-" + str(item["number"]), "label": "PR #" + str(item["number"]),
-                 "title": item["title"][:240], "body": (item.get("body") or "")[:700],
-                 "date": item.get("updated_at"), "url": f"https://github.com/{repo}/pull/{item['number']}"}
-                for item in pulls
-            ]
-            history_available = True
-        except (GitHubError, httpx.HTTPError, ValueError, KeyError):
-            pass
-        try:
-            commits = await api(http, f"/repos/{repo}/commits", {"sha": revision, "per_page": 8}, limit=600_000)
-            for item in commits:
-                if not SHA.fullmatch(item["sha"]):
-                    continue
-                title, _, message = item["commit"]["message"].partition("\n")
-                history.append({"id": "commit-" + item["sha"], "label": "Commit " + item["sha"][:7],
-                                "title": title[:240], "body": message.strip()[:700],
-                                "date": item["commit"]["committer"]["date"],
-                                "url": f"https://github.com/{repo}/commit/{item['sha']}"})
-            history_available = True
-        except (GitHubError, httpx.HTTPError, ValueError, KeyError, TypeError):
-            pass
+        history, history_available = await repository_history(
+            http, repo, branch, revision, commit["commit"].get("committer", {}).get("date"), files, fetch,
+        )
 
     return {
         "repo": repo, "branch": branch, "revision": revision, "description": (info.get("description") or "")[:300],
@@ -214,3 +191,107 @@ async def public_repositories(login, page):
         {"name": item["full_name"], "description": item.get("description"), "language": item.get("language")}
         for item in payload if item.get("private") is False
     ]
+
+CONTRIBUTION_LANGUAGES = ("Python", "JavaScript", "TypeScript", "Java", "Go", "Rust", "C++", "Ruby")
+CONTRIBUTION_LABELS = ("good first issue", "help wanted")
+
+
+async def contribution_issues(language, label, page):
+    query = (
+        f'is:issue is:open is:public is:unlocked no:assignee archived:false language:"{language}" '
+        f'label:"{label}"'
+    )
+    async with client() as http:
+        result = await api(http, "/search/issues", {
+            "q": query, "sort": "updated", "order": "desc", "per_page": 12, "page": page,
+        }, limit=1_500_000)
+    items = []
+    for item in result["items"]:
+        repo = item["repository_url"].removeprefix("https://api.github.com/repos/")
+        try:
+            repo = repo_name(repo)
+        except GitHubError:
+            continue
+        number = int(item["number"])
+        items.append({
+            "repo": repo, "number": number, "title": item["title"][:240],
+            "summary": (item.get("body") or "")[:400], "updated": item.get("updated_at"),
+            "url": f"https://github.com/{repo}/issues/{number}",
+        })
+    return {"items": items, "partial": result.get("incomplete_results", False),
+            "more": page < 10 and result.get("total_count", 0) > page * 12}
+
+
+async def repository_history(http, repo, branch, revision, cutoff, files, fetch):
+    base = f"/repos/{repo}"
+
+    async def get(path, **params):
+        try:
+            return await api(http, base + path, params, limit=1_500_000)
+        except (GitHubError, httpx.HTTPError, ValueError):
+            return None
+
+    def github_record(item, kind, number, title, link, **extra):
+        actor = (item.get("user") or item.get("author") or {}).get("login")
+        return {"id": f"{kind}-{number}", "kind": kind, "label": f"{kind.upper()} #{number}",
+                "title": title[:240], "body": (item.get("body") or "")[:1500],
+                "date": item.get("created_at"), "actor": actor, "url": link, **extra}
+
+    pulls, issues, commits = await asyncio.gather(
+        get("/pulls", state="closed", base=branch, per_page=12),
+        get("/issues", state="all", per_page=15),
+        get("/commits", sha=revision, per_page=12),
+    )
+    history = []
+    for item in pulls or []:
+        number = item["number"]
+        link = f"https://github.com/{repo}/pull/{number}"
+        history.append(github_record(item, "pr", number, item["title"], link, merged=item.get("merged_at"),
+                                     date_override=item.get("merged_at"), merge_sha=item.get("merge_commit_sha")))
+    for item in issues or []:
+        if "pull_request" not in item:
+            number = item["number"]
+            history.append(github_record(item, "issue", number, item["title"],
+                                         f"https://github.com/{repo}/issues/{number}"))
+    for item in commits or []:
+        sha = item["sha"]
+        if not SHA.fullmatch(sha):
+            continue
+        title, _, message = item["commit"]["message"].partition("\n")
+        history.append({
+            "id": f"commit-{sha}", "label": f"Commit {sha[:7]}", "kind": "commit",
+            "title": title[:240], "body": message.strip()[:1500], "actor": (item.get("author") or {}).get("login"),
+            "date": item["commit"]["committer"]["date"], "url": f"https://github.com/{repo}/commit/{sha}",
+        })
+    candidates = [row for row in history if row["kind"] == "pr" and row["merged"]
+                  and (not cutoff or row["merged"] <= cutoff)][:3]
+    for row in candidates:
+        number = row["id"].split("-")[1]
+        changed, comments = await asyncio.gather(
+            get(f"/pulls/{number}/files", per_page=30), get(f"/issues/{number}/comments", per_page=4),
+        )
+        row["paths"] = [item["filename"] for item in changed or []]
+        row["renames"] = [[item["previous_filename"], item["filename"]] for item in changed or []
+                          if item.get("previous_filename")]
+        for comment in comments or []:
+            comment_row = github_record(comment, "comment", comment["id"], f"Discussion on {row['label']}",
+                                        f"{row['url']}#issuecomment-{comment['id']}", parent=row["id"])
+            history.append(comment_row)
+    docs = sorted(
+        (entry for entry in files if 0 < entry.get("size", 0) <= FILE_BYTES
+         and re.search(r"(^|/)(adr|adrs|rfcs|decisions|design)(/|[._-])", entry["path"], re.IGNORECASE)
+         and entry["path"].lower().endswith((".md", ".rst"))),
+        key=lambda item: (item["path"].count("/"), item["path"]),
+    )[:4]
+    for path, content in await asyncio.gather(*(fetch(entry) for entry in docs)):
+        if content:
+            history.append({"id": "doc-" + path, "kind": "doc", "label": "Design document",
+                            "title": path, "body": content[:1500], "date": None,
+                            "url": source_href(repo, revision, path)})
+    if cutoff:
+        history = [row for row in history if
+                   (row.get("merged") or row.get("date") or "") <= cutoff]
+    for row in history:
+        row["date"] = row.pop("date_override", None) or row["date"]
+    available = bool(history) or any(batch is not None for batch in (pulls, issues, commits))
+    return sorted(history, key=lambda row: row["date"] or "", reverse=True), available

@@ -27,6 +27,14 @@ SkillForge Integrated helps students, developers, and working professionals eval
 | R9 | GitHub picker and scoring jobs | Support pasted public GitHub URLs and an opt-in GitHub connection that lists eligible repositories. Show the selected branch and evaluated commit SHA. Queue scoring with deduplication and visible progress. Disconnect stops new access. Scope supported repository access to the user's explicit selection. |
 | R10 | Code quality ranking | Score each eligible commit on a versioned, project-aware 1,000-point rubric. Preview applicable, excluded and uncertain criteria, then publish measured scores, weights, commit-pinned evidence, confidence and coverage. Compare compatible project, stack and measured-rubric cohorts. Tie equal scores and label insufficient coverage as unranked. Compare repeat scans at the same commit and changes over time. |
 | R11 | Scenario-based coding tests | Provide a curated catalog of real-life tasks that exercise data structures and algorithms, with sample cases, hidden edge and performance cases, language choice, submission history, and feedback. Judge with versioned problem data and publish problem topic and walkthrough after completion. Suggest relevant practice from repo findings where the connection is specific. |
+| R12 | Open source contributions | Find public, unassigned GitHub issues by repository language and contribution label. Show the issue, repository, last update and GitHub link. Prefill the normal repository import flow when the learner wants to inspect the code. Display empty, partial and retry states. Issue discovery grants no score or portfolio credit. |
+
+## PS T1.1 decision context pilot
+
+- Open Decision history from a scan or inspect the history attached to a file-backed finding on the Quality score tab. Keep the static finding, evaluated revision, points and pinned source visible.
+- Show recorded rationale when sampled evidence supports the question. Link commit, merged pull request, issue, discussion or design record, with date and author where available. The date filter limits evidence and supersession to the selected time. Abstain when the sample cannot establish intent.
+- Follow recorded file renames, changed file paths and explicit references. Show both records and the basis for explicit supersession or a later recorded change to the same setting. Mark retrieval mode and confidence. An authorized user can opt into a temporary Neo4j query, with local graph fallback on provider failure.
+- Use the delivery routing fixture to demonstrate supersession and compare it with a live public scan. This pilot uses bounded history. Overrides without a recorded setting change or explicit reference, and unresolved aliases, remain open for expanded indexing.
 
 ## Code quality scoring
 
@@ -53,5 +61,5 @@ Start with a proposed pilot of 12 tasks across arrays and hash maps, sorting and
 
 - Measure first scored repo, findings opened, re-scores after a new commit, and first completed test. Track the funnel through event names and opaque IDs without collecting resume text, source contents or prompts in analytics.
 - Initial pilot targets are at least 80% of ten moderated participants completing repo import, interpreting their lowest dimension and submitting a test without help. Compare rubric results with independent reviewer ratings before opening the pilot.
-- Release acceptance requires all R1–R11 scenarios to pass in staging, including ranking integrity, judge isolation, provider outages, account cleanup and workspace isolation. See the [build plan](BUILD_PLAN.md) for operational gates.
+- Release acceptance requires all R1–R12 scenarios to pass in staging, including ranking integrity, judge isolation, provider outages, account cleanup and workspace isolation. See the [build plan](BUILD_PLAN.md) for operational gates.
 - Open large repositories at folder level. Page large folders and draw a bounded set of direct neighbors for an inspected node. Keep search and the connection inspector available for relationships beyond those drawn on the canvas.

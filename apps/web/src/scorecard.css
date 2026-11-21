@@ -64,3 +64,6 @@
   .score-metric { padding: 10px; }
   .score-details .dimensions { grid-template-columns: 1fr; }
 }
+
+.finding-history { grid-column: 1 / -1; min-width: 0; }
+.findings .finding-history article { display: block; }

@@ -8,6 +8,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
+import { OpenSource } from './OpenSource'
 import { Practice } from './Practice'
 import { Career } from './Career'
 import { DecisionHistory } from './DecisionHistory'
@@ -17,7 +18,7 @@ import './styles.css'
 
 const CodeGraph = lazy(() => import('./Graph').then(module => ({ default: module.CodeGraph })))
 
-type View = 'workspace' | 'rankings' | 'practice' | 'career'
+type View = 'workspace' | 'rankings' | 'practice' | 'career' | 'opensource'
 type Tab = 'graph' | 'quality' | 'history'
 
 function App() {
@@ -160,6 +161,7 @@ function App() {
           <button aria-current={view === 'workspace' ? 'page' : undefined} onClick={() => setView('workspace')}><Graph size={18} /> Workspace</button>
           <button aria-current={view === 'rankings' ? 'page' : undefined} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
           <button aria-current={view === 'practice' ? 'page' : undefined} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
+          <button aria-current={view === 'opensource' ? 'page' : undefined} onClick={() => setView('opensource')}><GithubLogo size={18} /> Open Source</button>
           <button aria-current={view === 'career' ? 'page' : undefined} onClick={() => setView('career')}><Briefcase size={18} /> Career</button>
         </nav>
         <button className="top-account" onClick={() => setSettings(!settings)} aria-expanded={settings}>
@@ -240,14 +242,16 @@ function App() {
                 <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />
               </Suspense>}
               {tab === 'quality' && selectedState === 'review' && <RubricPreview key={active} snapshot={snapshot} onApprove={approveRubric} />}
-              {tab === 'quality' && selectedState !== 'review' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
+              {tab === 'quality' && selectedState !== 'review' && <Scorecard key={active ?? 'sample'} scanId={active} snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
                 onPractice={id => { setPracticeFocus(id); setView('practice'); window.scrollTo(0, 0) }} />}
-              {tab === 'history' && <DecisionHistory snapshot={snapshot} />}
+              {tab === 'history' && <DecisionHistory key={active ?? 'sample'} snapshot={snapshot} scanId={active} />}
             </>}
           </section>
         </div>
       </> : view === 'rankings' ? <Rankings scans={scans} onOpen={id => openScan(id, 'quality')} onWorkspace={() => setView('workspace')} />
-        : view === 'practice' ? <Practice enabled={!!session?.judge} initialProblem={practiceFocus} /> : <Career scans={scans} />}
+        : view === 'opensource' ? <OpenSource onExplore={repository => {
+          setRepo(repository); setConsent(false); openScan(null); window.scrollTo(0, 0)
+        }} /> : view === 'practice' ? <Practice enabled={!!session?.judge} initialProblem={practiceFocus} /> : <Career scans={scans} />}
     </main>
     <footer><span>SkillForge</span><span>Repository analysis and applied practice</span></footer>
     {picker && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Choose a GitHub repository">

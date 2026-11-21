@@ -17,6 +17,7 @@ os.environ["JUDGE_TOKEN"] = ""
 
 from skillforge import config
 from skillforge.db import engine
+from skillforge.decision_context import explain
 from skillforge.judge import matches
 from skillforge.main import app
 from skillforge.problem_scoring import assess_submission, best_assessments, developer_index, next_problem
@@ -65,6 +66,20 @@ class GraphAndScoreTests(unittest.TestCase):
         self.assertIn(("imports file", "src/app.ts", "src/greet.ts", 1), edges)
         self.assertIn(("calls · inferred", "src/app.ts::run", "src/greet.ts::greet", 2), edges)
         self.assertFalse(compile_snapshot({**snapshot, "eligible": 20})["quality"]["rankable"])
+
+    def test_later_commit_can_override_a_named_setting_without_referencing_the_old_commit(self):
+        rows = [
+            {"id": "commit-old", "kind": "commit", "date": "2026-09-20",
+             "title": "Set RETRY_LIMIT to 5", "body": "Set RETRY_LIMIT to 5 to reduce transient failures."},
+            {"id": "commit-new", "kind": "commit", "date": "2026-10-20",
+             "title": "Lower RETRY_LIMIT to 3", "body": "Lower RETRY_LIMIT to 3 to avoid long request delays."},
+        ]
+        snapshot = {**compile_snapshot(SNAPSHOT), "history": rows}
+        query = "Why lower RETRY_LIMIT?"
+        answer = asyncio.run(explain(snapshot, query, None, None))
+        self.assertIn("avoid long request delays", answer["answer"])
+        old = next(item for item in answer["evidence"] if item["record"]["id"] == "commit-old")
+        self.assertEqual(old["supersededBy"][0]["basis"], "Later recorded change to RETRY_LIMIT from 5 to 3")
 
     def test_boolean_answers_cannot_be_replaced_with_integers(self):
         self.assertTrue(matches([True, 4.0], [True, 4]))
@@ -236,3 +251,50 @@ class WorkspaceTests(unittest.TestCase):
             completed = client.patch(route, headers=ORIGIN, json={"state": "completed"}).json()
             self.assertIn("Python", completed["planned"])
             self.assertTrue(client.get("/api/career/report.pdf").content.startswith(b"%PDF-1.4"))
+
+    def test_decision_context_traces_supersession_and_abstains(self):
+        with TestClient(app) as client:
+            client.get("/api/session").raise_for_status()
+            route = "/api/sample/context"
+            query = {"question": "Why sort routes by zone before dispatch?", "path": "src/planner.ts"}
+            current = client.post(route, headers=ORIGIN, json=query).raise_for_status().json()
+            self.assertEqual(current["confidence"], "moderate")
+            self.assertIn("zone boundaries", current["answer"])
+            decision = current["evidence"][0]
+            self.assertEqual(decision["entities"], ["src/planner.ts"])
+            self.assertEqual(decision["actors"], ["sample-maintainer"])
+            self.assertIn("comment-4", {row["id"] for row in decision["related"]})
+            old = next(item for item in current["evidence"] if item["record"]["id"] == "pr-8")
+            self.assertEqual([row["id"] for row in old["supersededBy"]], ["pr-14"])
+            earlier = client.post(route, headers=ORIGIN, json={
+                **query, "question": "Why sort routes by arrival time?", "through": "2026-10-21",
+            }).raise_for_status().json()
+            self.assertIn("late deliveries", earlier["answer"])
+            self.assertEqual(earlier["evidence"][0]["supersededBy"], [])
+            unknown = client.post(route, headers=ORIGIN, json={
+                "question": "Why is the retry threshold ninety?", "path": "src/planner.ts",
+            }).raise_for_status().json()
+            self.assertIsNone(unknown["answer"])
+            self.assertEqual(unknown["confidence"], "insufficient")
+            with patch.dict(os.environ, {"NEO4J_PASSWORD": "fixture"}), patch(
+                "skillforge.decision_context.neo4j_paths", side_effect=ValueError,
+            ):
+                fallback = client.post(route, headers=ORIGIN, json={**query, "neo4j": True}).json()
+            self.assertEqual(fallback, {**current, "mode": "fallback"})
+
+    def test_contribution_search_and_context_require_a_workspace(self):
+        with TestClient(app) as owner, TestClient(app) as other:
+            discovery = "/api/contributions?language=Python&label=good%20first%20issue"
+            self.assertEqual(owner.get(discovery).status_code, 401)
+            owner.get("/api/session").raise_for_status()
+            other.get("/api/session").raise_for_status()
+            payload = {"items": [{"repo": "example/project", "number": 12}], "partial": True, "more": False}
+            with patch("skillforge.main.contribution_issues", return_value=payload) as github:
+                self.assertEqual(owner.get(discovery).raise_for_status().json(), payload)
+                github.assert_awaited_once_with("Python", "good first issue", 1)
+                self.assertEqual(owner.get(discovery.replace("Python", "unsupported")).status_code, 422)
+            result = owner.post("/api/scans", json={"repository": "example/project"}, headers=ORIGIN)
+            route = f"/api/scans/{result.raise_for_status().json()['id']}/context"
+            self.assertEqual(other.post(route, json={"question": "Why?"}, headers=ORIGIN).status_code, 404)
+            self.assertEqual(owner.post(route, json={"question": "Why?"}, headers=ORIGIN).status_code, 409)
+            owner.delete(route.removesuffix("/context"), headers=ORIGIN).raise_for_status()
