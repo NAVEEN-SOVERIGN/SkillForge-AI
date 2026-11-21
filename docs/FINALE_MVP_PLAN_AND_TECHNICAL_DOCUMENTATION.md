@@ -270,10 +270,6 @@ Scale from a sampled public-repository demo to a multi-user product only after t
 | Engineering/on-call lead | Change review needs historical incident context. | Identify files connected to retrieved issues/incidents. | Review cited history before a risky edit and share a PR comment. | File-level guardrail and evidence comment. | Guardrail exists; validate with user and improve clarity during finale. |
 | Open-source contributor/reviewer | New contributors lack project-specific context. | Ask a question in a supported spoken language. | Trace the answer to PR discussion, author and date before contributing. | Public repo walkthrough, reviewed transcript, source links and Time Machine. | Typed path exists; voice and additional-segment validation planned. |
 
-**Market validation record:**
-
-| Interview | Segment / role | Date and consent | Assumption before | What they said/did (evidence) | Product change / next experiment |
-|---|---|---|---|---|---|
-No customer interviews are recorded in this audit. Capture the three finale conversations separately, with consent, segment, date, initial assumption, observed evidence and product change. Do not include identifying details without permission.
+**Market validation:** No customer interviews are recorded in this audit. During the finale, capture three conversations with consent, noting each person's segment, initial assumption, observed evidence and resulting product change. Do not include identifying details without permission.
 
 The first user, payer, current alternative, switching reason, pricing hypothesis, market source, competitor comparison and first-user acquisition path are not yet validated. Add them only when supported by interview notes or named sources. Label earlier research separately from finale interviews.
