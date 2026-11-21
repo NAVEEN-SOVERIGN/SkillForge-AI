@@ -206,3 +206,12 @@ body #root > footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content
 @media (max-width: 1075px) {
   .practice-workbench { grid-template-columns: minmax(0,1fr); }
 }
+
+@media (min-width: 781px) and (max-width: 1000px) {
+  .top-inner { padding-inline: 18px; gap: 16px; }
+  .topbar nav { gap: 8px; flex-wrap: wrap; }
+  .topbar nav button { gap: 5px; font-size: 13px; }
+}
+.top-account { min-width: 0; }
+.top-account span { overflow: hidden; text-overflow: ellipsis; }
+.top-account svg { flex: none; }
