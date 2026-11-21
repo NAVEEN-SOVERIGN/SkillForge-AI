@@ -11,7 +11,7 @@ export type Snapshot = {
   repo: string; branch: string; revision: string; description: string; language: string | null; sample: boolean
   graph: { nodes: Node[]; edges: Edge[]; unresolved: number; limited: boolean }
   quality: Quality
-  history: { id: number; title: string; body: string; date: string; url?: string }[]
+  history: { id: number | string; label?: string; title: string; body: string; date: string | null; url?: string }[]
   history_available: boolean
   preview_paths: string[]
   review?: { mode: 'reviewed' | 'unavailable'; model?: string; findings: Citation[] }

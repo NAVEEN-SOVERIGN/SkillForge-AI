@@ -138,6 +138,12 @@ h1, h2, h3, h4, p { margin: 0; }
 .finding-pts { color: var(--green); font: 12px ui-monospace, Consolas, monospace; background: #e6ecd9; height: fit-content; padding: 4px; }
 .finding-pts.review { color: #7a4a30; background: #f4e8d9; }
 .history-panel article { border-top: 1px solid var(--rule); padding: 10px 0; }
+.history-date { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.history-date input { padding: 4px; max-width: 135px; border: 1px solid var(--rule); background: var(--paper); }
+.history-search { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.history-search .search-field { width: min(400px,100%); }
+.history-results { background: #eef3e7; padding: 10px; margin-bottom: 15px; border-radius: 5px; }
+.history-results > p { margin: 4px 0 9px; }
 .ranking-page { padding-top: 44px; display: grid; gap: 13px; }
 .ranking-page h1 { margin: 0; }
 .ranking-page > p:not(.eyebrow) { color: var(--muted); }

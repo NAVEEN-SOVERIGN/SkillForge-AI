@@ -10,6 +10,7 @@ import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
 import { Practice } from './Practice'
 import { Career } from './Career'
+import { DecisionHistory } from './DecisionHistory'
 import './styles.css'
 
 const CodeGraph = lazy(() => import('./Graph').then(module => ({ default: module.CodeGraph })))
@@ -231,7 +232,7 @@ function App() {
               </Suspense>}
               {tab === 'quality' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
                 onPractice={id => { setPracticeFocus(id); setView('practice'); window.scrollTo(0, 0) }} />}
-              {tab === 'history' && <History snapshot={snapshot} />}
+              {tab === 'history' && <DecisionHistory snapshot={snapshot} />}
             </>}
           </section>
         </div>
@@ -251,18 +252,6 @@ function App() {
           onClick={() => setPickerPage(pickerPage + 1)}>Next</button></div>
     </section></div>}
   </>
-}
-
-function History({ snapshot }: { snapshot: Snapshot }) {
-  return <section className="panel history-panel">
-    <h3>Recent pull request history</h3>
-    <p>This view uses a bounded history sample. Pull request text can provide context for a decision.</p>
-    {!snapshot.history_available && <p role="status">GitHub history is unavailable for this scan.</p>}
-    {snapshot.history_available && !snapshot.history.length && <p>No pull requests were found in the sample.</p>}
-    {snapshot.history.map(item => <article key={item.id}><span className="eyebrow">PR #{item.id} {item.date?.slice(0, 10)}</span>
-      <h4>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} <ArrowUpRight size={14} /></a> : item.title}</h4><p>{item.body}</p>
-    </article>)}
-  </section>
 }
 
 function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {

@@ -159,21 +159,37 @@ async def get_snapshot(repo):
             except (GitHubError, httpx.HTTPError, ValueError, AttributeError):
                 continue
         history = []
-        history_available = True
+        history_available = False
         try:
             pulls = await api(http, f"/repos/{repo}/pulls", {"state": "all", "per_page": 12}, limit=1_200_000)
             history = [
-                {"id": item["number"], "title": item["title"][:240], "body": (item.get("body") or "")[:700],
+                {"id": "pr-" + str(item["number"]), "label": "PR #" + str(item["number"]),
+                 "title": item["title"][:240], "body": (item.get("body") or "")[:700],
                  "date": item.get("updated_at"), "url": f"https://github.com/{repo}/pull/{item['number']}"}
                 for item in pulls
             ]
+            history_available = True
         except (GitHubError, httpx.HTTPError, ValueError, KeyError):
-            history_available = False
+            pass
+        try:
+            commits = await api(http, f"/repos/{repo}/commits", {"sha": revision, "per_page": 8}, limit=600_000)
+            for item in commits:
+                if not SHA.fullmatch(item["sha"]):
+                    continue
+                title, _, message = item["commit"]["message"].partition("\n")
+                history.append({"id": "commit-" + item["sha"], "label": "Commit " + item["sha"][:7],
+                                "title": title[:240], "body": message.strip()[:700],
+                                "date": item["commit"]["committer"]["date"],
+                                "url": f"https://github.com/{repo}/commit/{item['sha']}"})
+            history_available = True
+        except (GitHubError, httpx.HTTPError, ValueError, KeyError, TypeError):
+            pass
 
     return {
         "repo": repo, "branch": branch, "revision": revision, "description": (info.get("description") or "")[:300],
         "language": info.get("language"), "paths": paths, "sources": sources, "eligible": len(eligible),
-        "total_files": len(files), "truncated": bool(tree.get("truncated")), "history": history,
+        "total_files": len(files), "truncated": bool(tree.get("truncated")),
+        "history": sorted(history, key=lambda item: item["date"] or "", reverse=True),
         "history_available": history_available, "aliases": aliases,
     }
 
