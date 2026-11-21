@@ -142,10 +142,22 @@ async def get_snapshot(repo):
                 except (GitHubError, httpx.HTTPError):
                     return entry["path"], None
 
-        sources = dict(
-            (path, data) for path, data in await asyncio.gather(*(fetch(entry) for entry in small[:MAX_FILES]))
+        sources = {
+            path: data for path, data in await asyncio.gather(*(fetch(entry) for entry in small[:MAX_FILES]))
             if data is not None
-        )
+        }
+        configs = sorted(path for path in paths if path.rsplit("/", 1)[-1] == "tsconfig.json")[:4]
+        aliases = {}
+        for path in configs:
+            try:
+                raw_config = await read_source(http, repo, revision, path)
+                compiler = json.loads(raw_config).get("compilerOptions", {})
+                base = compiler.get("baseUrl", ".")
+                path_map = compiler.get("paths", {})
+                if isinstance(base, str) and isinstance(path_map, dict):
+                    aliases[path] = {"base": base, "paths": path_map}
+            except (GitHubError, httpx.HTTPError, ValueError, AttributeError):
+                continue
         history = []
         history_available = True
         try:
@@ -162,7 +174,7 @@ async def get_snapshot(repo):
         "repo": repo, "branch": branch, "revision": revision, "description": (info.get("description") or "")[:300],
         "language": info.get("language"), "paths": paths, "sources": sources, "eligible": len(eligible),
         "total_files": len(files), "truncated": bool(tree.get("truncated")), "history": history,
-        "history_available": history_available,
+        "history_available": history_available, "aliases": aliases,
     }
 
 

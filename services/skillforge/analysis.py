@@ -25,6 +25,7 @@ class Parsed:
     definitions: dict = field(default_factory=dict)
     calls: list = field(default_factory=list)
     exported: dict = field(default_factory=dict)
+    scopes: list = field(default_factory=list)
     syntax_ok: bool = True
 
 
@@ -41,6 +42,7 @@ def parse_python(code):
             case ast.FunctionDef() | ast.AsyncFunctionDef():
                 result.definitions[node.name] = node.lineno
                 result.exported[node.name] = node.name
+                result.scopes.append((node.name, node.lineno, node.end_lineno or node.lineno))
             case ast.Import():
                 for item in node.names:
                     alias = item.asname or item.name.split(".")[0]
@@ -113,6 +115,7 @@ def parse_js(code, language):
             name = value(target.child_by_field_name("name"))
             if name:
                 result.definitions[name] = line(target)
+                result.scopes.append((name, line(target), target.end_point.row + 1))
                 if exported:
                     is_default = any(child.type == "default" for child in statement.children)
                     result.exported["default" if is_default else name] = name
@@ -138,7 +141,37 @@ def parse_js(code, language):
     return result
 
 
-def resolve(spec, path, paths):
+def script_target(base, paths):
+    stem = posixpath.splitext(base)[0]
+    return next((item for item in [base, *(stem + ext for ext in EXTENSIONS),
+                 *(base + "/index" + ext for ext in EXTENSIONS)] if item in paths), None)
+
+
+def alias_target(spec, path, paths, aliases):
+    configs = sorted(aliases.items(), key=lambda item: len(item[0]), reverse=True)
+    for config, options in configs:
+        folder = posixpath.dirname(config)
+        if folder and not path.startswith(folder + "/"):
+            continue
+        for key, replacements in options["paths"].items():
+            if not isinstance(replacements, list) or len(key) > 150 or key.count("*") > 1:
+                continue
+            pattern = re.escape(key).replace(r"\*", "(.*)")
+            match = re.fullmatch(pattern, spec)
+            if not match:
+                continue
+            capture = match.group(1) if match.lastindex else ""
+            for replacement in replacements[:8]:
+                if not isinstance(replacement, str) or len(replacement) > 200:
+                    continue
+                candidate = posixpath.normpath(posixpath.join(folder, options["base"], replacement.replace("*", capture)))
+                if target := script_target(candidate, paths):
+                    return target, "file"
+            return spec, "unresolved"
+    return None
+
+
+def resolve(spec, path, paths, aliases):
     folder = posixpath.dirname(path)
     if path.endswith(".py"):
         levels = len(spec) - len(spec.lstrip("."))
@@ -156,11 +189,10 @@ def resolve(spec, path, paths):
 
     if spec.startswith("."):
         base = posixpath.normpath(posixpath.join(folder, spec))
-        stem = posixpath.splitext(base)[0]
-        for item in [base, *(stem + ext for ext in EXTENSIONS), *(base + "/index" + ext for ext in EXTENSIONS)]:
-            if item in paths:
-                return item, "file"
-        return spec, "unresolved"
+        target = script_target(base, paths)
+        return (target, "file") if target else (spec, "unresolved")
+    if alias := alias_target(spec, path, paths, aliases):
+        return alias
     if spec.startswith(("@/", "#", "/")):
         return spec, "unresolved"
     parts = spec.split("/")
@@ -215,7 +247,7 @@ def structure(snapshot):
     for path, current in parsed.items():
         bindings = {}
         for spec, local, name, line in current.imports:
-            dest, kind = resolve(spec, path, snapshot["paths"])
+            dest, kind = resolve(spec, path, snapshot["paths"], snapshot.get("aliases", {}))
             if kind == "unresolved":
                 identifier = "unresolved:" + spec
                 unresolved += 1
@@ -236,7 +268,9 @@ def structure(snapshot):
             name = member if imported == "*" else imported if member is None else None
             symbol = other.exported.get(name) if other else None
             if symbol and symbol in other.definitions:
-                edge(path, dest + "::" + symbol, "calls · inferred", path, line)
+                caller = next((function for function, start, end in current.scopes if start <= line <= end), None)
+                edge(path, dest, "calls across files · inferred", path, line)
+                edge(path + "::" + caller if caller else path, dest + "::" + symbol, "calls · inferred", path, line)
             else:
                 unresolved += 1
     return {
@@ -293,7 +327,7 @@ def quality(snapshot, parsed):
           "Review explicit FIXME or HACK markers in sampled source.", next(iter(todo), None))
     check("Testing and CI", "Test files are present", 12, bool(tests),
           "File naming shows test presence. Assertion quality and test results require separate evidence.",
-          (sorted(tests)[0], 1) if tests else None)
+          (min(tests), 1) if tests else None)
     check("Testing and CI", "GitHub Actions configuration", 8, bool(ci),
           "Looks for a checked-in workflow. A file alone does not establish that CI passes.", (ci[0], 1) if ci else None)
     check("Dependency hygiene", "Dependency manifest", 5, bool(projects),

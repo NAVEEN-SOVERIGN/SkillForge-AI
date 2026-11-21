@@ -1,5 +1,5 @@
 
-import { StrictMode, useEffect, useState } from 'react'
+import { lazy, StrictMode, Suspense, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
@@ -8,10 +8,11 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
-import { CodeGraph } from './Graph'
 import { Practice } from './Practice'
 import { Career } from './Career'
 import './styles.css'
+
+const CodeGraph = lazy(() => import('./Graph').then(module => ({ default: module.CodeGraph })))
 
 type View = 'workspace' | 'rankings' | 'practice' | 'career'
 type Tab = 'graph' | 'quality' | 'history'
@@ -225,7 +226,9 @@ function App() {
                 <button className={tab === 'quality' ? 'current' : ''} onClick={() => setTab('quality')}><ListChecks size={17} /> Quality score</button>
                 <button className={tab === 'history' ? 'current' : ''} onClick={() => setTab('history')}><GitBranch size={17} /> Decision history</button>
               </div>
-              {tab === 'graph' && <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />}
+              {tab === 'graph' && <Suspense fallback={<p className="status-panel" role="status">Loading code graph…</p>}>
+                <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />
+              </Suspense>}
               {tab === 'quality' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
                 onPractice={id => { setPracticeFocus(id); setView('practice'); window.scrollTo(0, 0) }} />}
               {tab === 'history' && <History snapshot={snapshot} />}

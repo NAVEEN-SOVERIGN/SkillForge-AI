@@ -13,6 +13,8 @@ const types = ['file', 'function', 'package', 'folder', 'unresolved']
 export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: string | null }) {
   const container = useRef<HTMLDivElement>(null)
   const graph = useRef<Core | null>(null)
+  const inspectorTitle = useRef<HTMLHeadingElement>(null)
+  const sourceBlock = useRef<HTMLPreElement>(null)
   const [selected, setSelected] = useState<Node | null>(null)
   const [preview, setPreview] = useState<Source | null>(null)
   const [highlight, setHighlight] = useState<number | null>(null)
@@ -21,6 +23,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState('all')
+  const [connectionKind, setConnectionKind] = useState('all')
   const [mode, setMode] = useState('files')
   const [showList, setShowList] = useState(false)
   const previewSeq = useRef(0)
@@ -49,6 +52,10 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
         { selector: 'edge[kind ^= "calls"]', style: {
           'line-color': '#7b84c6', 'target-arrow-color': '#5765b0', 'line-style': 'dashed',
         } },
+        { selector: 'edge:selected', style: {
+          label: 'data(kind)', 'font-size': 10, color: '#23362c', 'text-background-color': '#f7faf2',
+          'text-background-opacity': 1, 'text-background-padding': '3px',
+        } },
       ],
     })
     cy.on('tap', 'node', event => {
@@ -60,12 +67,14 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
   }, [])
 
   const allNodes = useMemo(() => new Map(snapshot.graph.nodes.map(node => [node.id, node])), [snapshot])
+  const visibleEdges = useMemo(() => snapshot.graph.edges.filter(edge =>
+    connectionKind === 'all' || edge.kind.startsWith(connectionKind)), [connectionKind, snapshot])
   const connections = selected
-    ? snapshot.graph.edges.filter(edge => edge.target === selected.id || edge.source === selected.id)
+    ? visibleEdges.filter(edge => edge.target === selected.id || edge.source === selected.id)
     : []
 
   const visibleNodes = useMemo(() => {
-    const specific = mode === 'all' || kind === 'function' || query.trim()
+    const specific = mode === 'all' || kind === 'function' || connectionKind === 'calls' || query.trim()
     let nodes = snapshot.graph.nodes.filter(node => specific || node.kind !== 'function')
     if (kind !== 'all') {
       const wanted = new Set(nodes.filter(node => node.kind === kind).map(node => node.id))
@@ -78,7 +87,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       nodes = nodes.filter(node => wanted.has(node.id))
     }
     return nodes
-  }, [snapshot, mode, kind, allNodes, query])
+  }, [snapshot, mode, kind, allNodes, query, connectionKind])
 
   useEffect(() => {
     const cy = graph.current
@@ -89,8 +98,8 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       cy.add(visibleNodes.map(node => ({
         data: { id: node.id, label: node.label, kind: node.kind, color: colors[node.kind], payload: node },
       })))
-      cy.add(snapshot.graph.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)).map((edge, index) => ({
-        data: { id: 'edge-' + index, source: edge.source, target: edge.target, kind: edge.kind },
+      cy.add(visibleEdges.filter(edge => visible.has(edge.source) && visible.has(edge.target)).map((edge, index) => ({
+        data: { id: 'edge-' + index, source: edge.source, target: edge.target, kind: edge.kind, payload: edge },
       })))
     })
     if (cy.nodes().length) {
@@ -98,7 +107,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       if (cy.zoom() > 1.15) cy.zoom(1.15)
       cy.center()
     }
-  }, [snapshot, visibleNodes])
+  }, [visibleEdges, visibleNodes])
 
   useEffect(() => {
     const cy = graph.current
@@ -115,6 +124,12 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
   useEffect(() => {
     if (selected) graph.current?.getElementById(selected.id).select()
   }, [selected, visibleNodes])
+
+  useEffect(() => {
+    const block = sourceBlock.current
+    const line = block?.querySelector<HTMLElement>('.highlight-line')
+    if (block && line) block.scrollTop = line.offsetTop - block.offsetTop - 30
+  }, [preview, highlight])
 
   async function showSource(path: string, line: number | null) {
     const sequence = ++previewSeq.current
@@ -138,6 +153,18 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
     setShowList(false)
     if (node.path && snapshot.preview_paths.includes(node.path)) void showSource(node.path, node.line)
   }
+
+  useEffect(() => {
+    const cy = graph.current
+    if (!cy) return
+    const onEdge = (event: cytoscape.EventObject) => {
+      const edge = event.target.data('payload') as Edge
+      setSelected(allNodes.get(edge.target) ?? null)
+      if (edge.line && snapshot.preview_paths.includes(edge.path)) void showSource(edge.path, edge.line)
+    }
+    cy.on('tap', 'edge', onEdge)
+    return () => { cy.off('tap', 'edge', onEdge) }
+  }, [allNodes, snapshot.preview_paths, scanId])
 
   function zoom(scale: number) {
     const cy = graph.current
@@ -166,6 +193,10 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       <label className="select-field"><FunnelSimple size={16} /><select aria-label="Filter graph node type" value={kind}
         onChange={event => setKind(event.target.value)}><option value="all">All types</option>
         {types.map(type => <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>)}</select></label>
+      <label className="select-field"><select aria-label="Filter graph connections" value={connectionKind}
+        onChange={event => setConnectionKind(event.target.value)}><option value="all">All connections</option>
+        <option value="imports">Imports</option><option value="calls">Function calls</option>
+        <option value="contains">Folder structure</option><option value="defines">Definitions</option></select></label>
       <button className="button compact" onClick={() => setMode(mode === 'files' ? 'all' : 'files')} aria-pressed={mode === 'all'}>
         {mode === 'all' ? 'Hide functions' : 'Show functions'}
       </button>
@@ -178,7 +209,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
         <div className="canvas" aria-hidden="true" ref={container} />
         {!visibleNodes.length && <p className="canvas-empty">No graph nodes available for this selection.</p>}
         {showList && <div className="node-list" aria-label="Graph nodes">
-          {list.length ? list.map(node => <button key={node.id} onClick={() => selectNode(node)}>
+          {list.length ? list.map(node => <button key={node.id} onClick={() => { selectNode(node); requestAnimationFrame(() => inspectorTitle.current?.focus()) }}>
             <span className="color-dot" style={{ background: colors[node.kind] }} />{node.label}<small>{node.path ?? node.kind}</small>
           </button>) : <p>No matching nodes.</p>}
         </div>}
@@ -192,7 +223,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
         <div className="split"><span className="eyebrow">{selected.kind}</span>
           <button className="icon-button" aria-label="Close node details" onClick={() => { setSelected(null); graph.current?.nodes().unselect() }}><X size={16} /></button>
         </div>
-        <h3>{selected.label}</h3>
+        <h3 tabIndex={-1} ref={inspectorTitle}>{selected.label}</h3>
         <p className="mono word-wrap">{selected.path}</p>
         {selected.path && snapshot.preview_paths.includes(selected.path) && <button className="button compact"
           onClick={() => void showSource(selected.path!, selected.line)}>Open source</button>}
@@ -215,7 +246,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
       {loading && <p>Fetching pinned source…</p>}{previewError && <p role="alert">{previewError}</p>}
       {draft !== null ? <label className="draft-field">Local scratch draft<textarea value={draft}
         aria-label="Local scratch draft" onChange={event => setDraft(event.target.value)} spellCheck={false} /></label>
-        : preview && <pre>{preview.source.split('\n').map((line, index) => <span key={index} className={highlight === index + 1 ? 'highlight-line' : ''}>
+        : preview && <pre ref={sourceBlock}>{preview.source.split('\n').map((line, index) => <span key={index} className={highlight === index + 1 ? 'highlight-line' : ''}>
           <i>{index + 1}</i>{line || ' '}
         </span>)}</pre>}
     </section>}

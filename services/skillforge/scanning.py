@@ -59,8 +59,8 @@ async def run_scans():
             if claimed:
                 await perform(*claimed)
                 continue
-        except Exception:
-            logger.error("Scan worker iteration failed.")
+        except Exception as exc:  # noqa: BLE001 - Keep the queue alive and omit untrusted exception content.
+            logger.error("Scan worker iteration failed (%s).", type(exc).__name__)
         await asyncio.sleep(1.25)
 
 
@@ -75,8 +75,8 @@ async def perform(scan, lease):
         await asyncio.to_thread(finish, scan["id"], lease, "complete", payload)
     except GitHubError as exc:
         await asyncio.to_thread(finish, scan["id"], lease, "failed", {"error": str(exc), "retryAt": exc.retry_at})
-    except (Exception, TimeoutError):
-        logger.warning("Repository scan did not complete.")
+    except Exception as exc:  # noqa: BLE001 - Finish the job without exposing provider or repository content.
+        logger.warning("Repository scan did not complete (%s).", type(exc).__name__)
         await asyncio.to_thread(finish, scan["id"], lease, "failed", {"error": "Analysis was interrupted. Try again."})
 
 
