@@ -3,15 +3,16 @@ import { lazy, StrictMode, Suspense, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
-  ArrowDownRight, ArrowRight, ArrowUpRight, ChartBar, CheckCircle, Code, GitBranch, GithubLogo,
-  Briefcase, Graph, ListChecks, Plus, Sparkle, Trash, X,
+  ArrowRight, ArrowUpRight, ChartBar, Code, GitBranch, GithubLogo,
+  Briefcase, Graph, ListChecks, Plus, Trash, X,
 } from '@phosphor-icons/react'
 import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
 import { Practice } from './Practice'
 import { Career } from './Career'
 import { DecisionHistory } from './DecisionHistory'
-import { RubricPreview, RubricCriteria } from './RubricPreview'
+import { RubricPreview } from './RubricPreview'
+import { Scorecard } from './Scorecard'
 import './styles.css'
 
 const CodeGraph = lazy(() => import('./Graph').then(module => ({ default: module.CodeGraph })))
@@ -151,21 +152,22 @@ function App() {
     && snapshot?.quality.rankable && scoreGroup(row.summary) === scoreGroup(snapshot.quality))
 
   return <>
+    <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="topbar">
       <div className="top-inner">
         <button className="brand" onClick={() => openScan(null)}><span className="brand-mark"><GitBranch size={21} weight="bold" /></span><span>SkillForge</span></button>
         <nav aria-label="Main navigation">
-          <button className={view === 'workspace' ? 'nav-active' : ''} onClick={() => setView('workspace')}><Graph size={18} /> Workspace</button>
-          <button className={view === 'rankings' ? 'nav-active' : ''} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
-          <button className={view === 'practice' ? 'nav-active' : ''} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
-          <button className={view === 'career' ? 'nav-active' : ''} onClick={() => setView('career')}><Briefcase size={18} /> Career</button>
+          <button aria-current={view === 'workspace' ? 'page' : undefined} onClick={() => setView('workspace')}><Graph size={18} /> Workspace</button>
+          <button aria-current={view === 'rankings' ? 'page' : undefined} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
+          <button aria-current={view === 'practice' ? 'page' : undefined} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
+          <button aria-current={view === 'career' ? 'page' : undefined} onClick={() => setView('career')}><Briefcase size={18} /> Career</button>
         </nav>
         <button className="top-account" onClick={() => setSettings(!settings)} aria-expanded={settings}>
           <GithubLogo size={18} /><span>{session?.login ?? 'Account'}</span>
         </button>
       </div>
     </header>
-    <main className="shell">
+    <main className="shell" id="main-content" tabIndex={-1}>
       {settings && <section className="settings-panel" aria-label="Account settings">
         <div className="split"><h2>Account</h2><button className="icon-button" onClick={() => setSettings(false)} aria-label="Close account settings"><X size={17} /></button></div>
         <p>{session?.login ? 'Connected as ' + session.login : 'You’re using a temporary workspace.'}</p>
@@ -181,12 +183,11 @@ function App() {
       {view === 'workspace' ? <>
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow"><span className="accent-square" /> Repository workspace</p>
-            <h1>See how your<br className="desktop-break" /> code fits together<span>.</span></h1>
-            <p>Map imports and calls, review common engineering practices, and see what to improve in your GitHub projects.</p>
+            <h1>Understand the <em>code</em><br className="desktop-break" /> <em>you ship.</em></h1>
+            <p>Explore how a repository fits together and see what its quality score is based on.</p>
           </div>
           <form className="import-panel" onSubmit={start}>
-            <div className="import-title"><span className="up-arrow"><ArrowDownRight size={21} weight="bold" /></span><h2>Analyze a repository</h2></div>
+            <div className="import-title"><h2>Analyze a repository</h2></div>
             <label htmlFor="repository">Public GitHub URL</label>
             <div className="input-line"><GithubLogo size={19} /><input id="repository" autoComplete="off" value={repo} maxLength={280}
               onChange={event => setRepo(event.target.value)} placeholder="github.com/owner/repository" required /></div>
@@ -196,18 +197,17 @@ function App() {
               <button className="button primary" disabled={busy || !session}>{busy ? 'Queuing…' : 'Analyze repo'} <ArrowRight size={17} /></button>
               {session?.oauth && !session.login && <a href="/api/auth/github" className="text-button">Connect GitHub</a>}
               {session?.login && <button type="button" className="text-button" onClick={() => { setPickerPage(1); setPicker(true) }}>Choose from GitHub</button>}
-              <button type="button" className="text-button" onClick={() => openScan(null)}>Explore example</button>
             </div>
           </form>
         </section>
         <div className="workspace-grid">
           <aside className="library">
             <div className="split"><h2>Repositories</h2><button className="icon-button" aria-label="Focus repository import" onClick={() => document.getElementById('repository')?.focus()}><Plus size={17} /></button></div>
-            <button className={'library-item' + (!active ? ' active' : '')} onClick={() => openScan(null)}>
-              <GitBranch size={17} /><span><strong>delivery-routing</strong><small>Example workspace</small></span>
+            <button className={'library-item' + (!active ? ' active' : '')} aria-pressed={!active} onClick={() => openScan(null)}>
+              <GitBranch size={17} /><span><strong>delivery-routing</strong><small>Example repository</small></span>
             </button>
             {scans.map(scan => <div className={'library-row' + (scan.id === active ? ' active' : '')} key={scan.id}>
-              <button className="library-item" onClick={() => openScan(scan.id)}>
+              <button className="library-item" aria-pressed={scan.id === active} onClick={() => openScan(scan.id)}>
                 <GitBranch size={17} /><span><strong>{scan.repo}</strong><small>{pending(scan) ? scan.state : scan.state === 'failed' ? 'Needs attention'
                   : scan.state === 'review' ? 'Rubric ready for review' : (scan.revision?.slice(0, 7) ?? 'Complete') +
                   (scan.summary?.score != null ? ' · ' + scan.summary.score + '/' + (scan.summary.scale ?? 100) : '')}</small></span>
@@ -221,7 +221,7 @@ function App() {
             <div className="detail-heading">
               <div><p className="eyebrow">{snapshot?.sample ? 'Example repository' : 'Repository analysis'}</p>
                 <h2>{snapshot?.repo ?? selectedRow?.repo ?? 'Repository analysis'}</h2>
-                {snapshot && <p>{snapshot.description || 'Analyze the structure and quality of this revision.'}</p>}</div>
+                {snapshot?.description && <p>{snapshot.description}</p>}</div>
               {snapshot && <div className="revision"><GitBranch size={16} /> {snapshot.branch}<span>{snapshot.revision.slice(0, 7)}</span></div>}
             </div>
             {!snapshot && !loadError && !summary && <div className="status-panel" role="status">{selectedState === 'queued' ? 'Waiting for an analysis worker…'
@@ -232,9 +232,9 @@ function App() {
               <button className="button" onClick={() => { setRepo(selectedRow!.repo); document.getElementById('repository')?.focus() }}>Prepare another scan</button></div>}
             {snapshot && <>
               <div className="tabbar" aria-label="Repository views">
-                <button className={tab === 'graph' ? 'current' : ''} onClick={() => setTab('graph')}><Graph size={17} /> Code graph</button>
-                <button className={tab === 'quality' ? 'current' : ''} onClick={() => setTab('quality')}><ListChecks size={17} /> Quality score</button>
-                <button className={tab === 'history' ? 'current' : ''} onClick={() => setTab('history')}><GitBranch size={17} /> Decision history</button>
+                <button aria-pressed={tab === 'graph'} onClick={() => setTab('graph')}><Graph size={17} /> Code graph</button>
+                <button aria-pressed={tab === 'quality'} onClick={() => setTab('quality')}><ListChecks size={17} /> Quality score</button>
+                <button aria-pressed={tab === 'history'} onClick={() => setTab('history')}><GitBranch size={17} /> Decision history</button>
               </div>
               {tab === 'graph' && <Suspense fallback={<p className="status-panel" role="status">Loading code graph…</p>}>
                 <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />
@@ -262,57 +262,6 @@ function App() {
           onClick={() => setPickerPage(pickerPage + 1)}>Next</button></div>
     </section></div>}
   </>
-}
-
-function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {
-  snapshot: Snapshot; previous?: Scan; comparable: Scan[]; onCompare: (scan?: Scan) => void; onPractice: (id: string) => void
-}) {
-  const quality = snapshot.quality
-  const delta = previous?.summary?.score != null && quality.score != null ? quality.score - previous.summary.score : null
-  return <div className="report">
-    <section className="score-overview panel">
-      <div><p className="eyebrow">{quality.archetype ? 'Repository engineering score' : 'Legacy quality score'}</p>
-        <p className="score-number">{quality.score ?? '—'}<span> / {quality.scale ?? 100}</span></p>
-        {quality.archetype && <p><strong>{quality.archetype}{quality.grade && ' · Grade ' + quality.grade}</strong></p>}
-        <p>{quality.coverage.analyzed} of {quality.coverage.eligible} eligible files analyzed · {quality.coverage.percent}% coverage</p>
-        {quality.evaluationCoverage !== undefined && <p>{quality.evaluationCoverage}% of relevant weight measured · {quality.confidence} static confidence</p>}
-        <p>{quality.rankable ? quality.cohort + ' cohort' : 'Unranked · evaluation incomplete or challenged'} · {quality.version}</p>
-        {quality.severityCap != null && <p>Severe finding capped the score at {quality.severityCap}.</p>}
-        {quality.review?.note && <p>Open context question · {quality.review.note}</p>}
-        {!!comparable.length && <label className="comparison">Compare with <select value={previous?.id ?? ''} onChange={event => onCompare(comparable.find(scan => scan.id === event.target.value))}>
-          <option value="">Select revision</option>{comparable.map(scan => <option key={scan.id} value={scan.id}>{scan.revision?.slice(0, 7)} · {new Date(scan.created * 1000).toLocaleDateString()}</option>)}
-        </select>{delta !== null && <strong>{delta > 0 ? '+' : ''}{delta} points</strong>}</label>}
-      </div>
-      <div className="dimensions">{quality.dimensions.map(dimension => <div key={dimension.name}>
-        <div className="split"><span>{dimension.name}</span><strong>{dimension.max ? dimension.points + '/' + dimension.max : 'Unmeasured'}</strong></div>
-        <progress value={dimension.points} max={dimension.max || 1} aria-label={dimension.name} />
-      </div>)}</div>
-    </section>
-    {quality.criteria && <section className="panel"><h3>Project rubric</h3><RubricCriteria criteria={quality.criteria} /></section>}
-    <section className="panel findings">
-      <h3>Evidence and next steps</h3>
-      <p>These checks look for common engineering signals in the sampled revision.</p>
-      {[...quality.findings].sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical') ||
-        Number(a.state === 'met') - Number(b.state === 'met') || b.max - a.max).map(finding =>
-        <article key={finding.title}><div className="finding-icon">{finding.state === 'met' ? <CheckCircle size={22} /> : <Code size={22} />}</div>
-          <div><h4>{finding.title}</h4><p>{finding.detail}</p>{finding.path && <small className="mono">{finding.url && !snapshot.sample
-            ? <a href={finding.url} target="_blank" rel="noreferrer">{finding.path}:{finding.line} <ArrowUpRight size={13} /></a>
-            : finding.path + ':' + finding.line}</small>}
-            {finding.state === 'review' && ['Performance hygiene', 'Performance'].includes(finding.dimension) && <button className="text-button"
-              onClick={() => onPractice('load-monitor')}>Practice efficient processing</button>}
-            {finding.state === 'review' && ['Test files are present', 'Assertions in sampled tests'].includes(finding.title) && <button className="text-button"
-              onClick={() => onPractice('support-coverage')}>Practice boundary cases</button>}</div>
-          <span className={'finding-pts ' + finding.state}>{finding.points == null ? 'Unmeasured' : finding.points + '/' + finding.max}</span></article>)}
-    </section>
-    {snapshot.review && <section className="panel findings">
-      <h3><Sparkle size={20} /> Optional Gemini review</h3>
-      {snapshot.review.mode === 'unavailable' && <p>Gemini was unavailable. The static quality report is ready.</p>}
-      {snapshot.review.mode === 'reviewed' && !snapshot.review.findings.length && <p>No cited additional findings returned.</p>}
-      {snapshot.review.findings.map((item, index) => <article key={index}>
-        <div className="finding-icon"><Sparkle size={20} /></div><div><h4>{item.title}</h4><p>{item.detail}</p>
-          {item.url && <a href={item.url} target="_blank" rel="noreferrer">{item.path}:{item.line} <ArrowUpRight size={14} /></a>}</div></article>)}
-    </section>}
-  </div>
 }
 
 function scoreGroup(summary: NonNullable<Scan['summary']>) {

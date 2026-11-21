@@ -1,21 +1,43 @@
 
-import { ArrowsOutSimple, ArrowUpRight, FunnelSimple, MagnifyingGlass, Minus, Plus, X } from '@phosphor-icons/react'
+import {
+  ArrowLeft, ArrowRight, ArrowsOutSimple, ArrowUpRight, Code, FolderSimple, Graph, ListBullets,
+  MagnifyingGlass, Minus, Plus, X,
+} from '@phosphor-icons/react'
 import cytoscape, { type Core } from 'cytoscape'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Edge, Node, Snapshot, Source } from './api'
 import { api, errorText } from './api'
+import { folderOverview, neighborhood, PAGE_SIZE, parentScope, ROOT_FILES, searchNodes } from './graphView'
+import type { AggregateEdge, OverviewNode } from './graphView'
+import './graph.css'
 
 const colors: Record<string, string> = {
-  file: '#226a59', folder: '#8d744b', function: '#4b58ad', package: '#a35b45', unresolved: '#777778',
+  file: '#79dad8', folder: '#82aaff', function: '#c0a6ff', package: '#f5ba80', unresolved: '#bcc4d1',
 }
-const types = ['file', 'function', 'package', 'folder', 'unresolved']
+const types = ['folder', 'file', 'function', 'package', 'unresolved']
+const typeName = (kind: string) => kind === 'unresolved' ? 'Unresolved' : kind.charAt(0).toUpperCase() + kind.slice(1)
+const scopeName = (scope: string) => scope === ROOT_FILES ? 'Root files' : scope.replace(/\/$/, '')
+const sourceAvailable = (node: Node, snapshot: Snapshot) => node.path && snapshot.preview_paths.includes(node.path)
+type DrawnEdge = Edge | AggregateEdge
+
+function relationLabel(edge: DrawnEdge) {
+  return 'count' in edge ? edge.count + ' ' + (edge.kind === 'calls' ? 'calls' : 'imports')
+    : edge.kind === 'defines' ? 'Defines' : edge.kind
+}
 
 export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: string | null }) {
   const container = useRef<HTMLDivElement>(null)
   const graph = useRef<Core | null>(null)
+  const canvasTitle = useRef<HTMLHeadingElement>(null)
   const inspectorTitle = useRef<HTMLHeadingElement>(null)
+  const searchInput = useRef<HTMLInputElement>(null)
   const sourceBlock = useRef<HTMLPreElement>(null)
+  const previewTitle = useRef<HTMLHeadingElement>(null)
+  const [width, setWidth] = useState(640)
+  const [scope, setScope] = useState('')
+  const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Node | null>(null)
+  const [edgeDetail, setEdgeDetail] = useState('')
   const [preview, setPreview] = useState<Source | null>(null)
   const [highlight, setHighlight] = useState<number | null>(null)
   const [draft, setDraft] = useState<string | null>(null)
@@ -23,121 +45,114 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState('all')
-  const [connectionKind, setConnectionKind] = useState('all')
-  const [mode, setMode] = useState('files')
-  const [showList, setShowList] = useState(false)
+  const [filter, setFilter] = useState('all')
+  const [browse, setBrowse] = useState(false)
   const previewSeq = useRef(0)
+
+  const allNodes = useMemo(() => new Map(snapshot.graph.nodes.map(node => [node.id, node])), [snapshot])
+  const overview = useMemo(() => folderOverview(snapshot.graph.nodes, snapshot.graph.edges, scope, page, filter),
+    [snapshot, scope, page, filter])
+  const focused = useMemo(() => selected ? neighborhood(selected, snapshot.graph.edges, allNodes, filter) : null,
+    [selected, snapshot, allNodes, filter])
+  const matches = useMemo(() => browse ? searchNodes(snapshot.graph.nodes, query, kind) : [],
+    [snapshot, query, kind, browse])
+  const nodes: OverviewNode[] = focused ? focused.nodes : overview.nodes
+  const columns = width >= 620 ? 3 : width >= 300 ? 2 : 1
+  const horizontal = width >= 560
+  const rows = focused ? horizontal ? Math.max(focused.incoming.length, focused.outgoing.length)
+    : Math.ceil((focused.nodes.length - 1) / columns) + 1 : Math.ceil(nodes.length / columns)
+  const height = Math.max(306, 65 + Math.max(1, rows) * 81)
+  const nodeWidth = Math.min(176, Math.max(94, width / (focused && horizontal ? 3 : columns) - 27))
 
   useEffect(() => {
     if (!container.current) return
     const cy = cytoscape({
-      container: container.current, elements: [], minZoom: 0.05, maxZoom: 2,
-      wheelSensitivity: 0.2, autoungrabify: false,
+      container: container.current, elements: [], minZoom: .55, maxZoom: 1.6,
+      autoungrabify: true, boxSelectionEnabled: false, userZoomingEnabled: false,
       style: [
         { selector: 'node', style: {
-          'background-color': 'data(color)', label: 'data(label)', color: '#252e29',
-          'font-size': 11, 'font-family': 'system-ui', 'text-valign': 'bottom',
-          'text-margin-y': 6, 'text-max-width': '145px', 'text-wrap': 'ellipsis',
-          width: 20, height: 20, 'border-width': 1, 'border-color': '#ffffff',
+          shape: 'round-rectangle', width: 'data(width)', height: 48,
+          'background-color': '#1b2636', 'border-color': 'data(color)', 'border-width': 1.25,
+          label: 'data(label)', color: '#ecf2fb', 'font-size': 13, 'font-weight': 600,
+          'font-family': 'system-ui', 'text-valign': 'center', 'text-halign': 'center',
+          'text-max-width': 'data(textWidth)', 'text-wrap': 'ellipsis',
+          'overlay-opacity': 0,
         } },
-        { selector: 'node[kind = "folder"]', style: { shape: 'round-rectangle', width: 27, height: 16 } },
-        { selector: 'node[kind = "package"]', style: { shape: 'hexagon' } },
-        { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#a7c85f', width: 26, height: 26 } },
-        { selector: 'node.match', style: { 'border-width': 4, 'border-color': '#f7b259' } },
-        { selector: 'node.dim', style: { opacity: 0.35 } },
+        { selector: 'node[center = "yes"]', style: { 'background-color': '#283c58', 'border-width': 2.5 } },
+        { selector: 'node:selected', style: { 'background-color': '#26394e' } },
         { selector: 'edge', style: {
-          width: 1.3, 'curve-style': 'bezier', 'line-color': '#b4c0b6',
-          'target-arrow-color': '#758f80', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.85,
+          width: 1.4, 'curve-style': 'bezier', 'line-color': '#627b99',
+          'target-arrow-color': '#7797b9', 'target-arrow-shape': 'triangle', 'arrow-scale': .8,
+          'overlay-opacity': 0,
         } },
         { selector: 'edge[kind ^= "calls"]', style: {
-          'line-color': '#7b84c6', 'target-arrow-color': '#5765b0', 'line-style': 'dashed',
+          'line-color': '#b59ee8', 'target-arrow-color': '#b59ee8', 'line-style': 'dashed',
         } },
-        { selector: 'edge:selected', style: {
-          label: 'data(kind)', 'font-size': 10, color: '#23362c', 'text-background-color': '#f7faf2',
-          'text-background-opacity': 1, 'text-background-padding': '3px',
-        } },
+        { selector: 'edge:selected', style: { width: 3, 'line-color': '#83dedd', 'target-arrow-color': '#83dedd' } },
       ],
     })
-    cy.on('tap', 'node', event => {
-      setSelected(event.target.data('payload') as Node)
-      setDraft(null)
-    })
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    observer.observe(container.current)
     graph.current = cy
-    return () => { graph.current = null; cy.destroy() }
+    return () => { observer.disconnect(); graph.current = null; cy.destroy() }
   }, [])
-
-  const allNodes = useMemo(() => new Map(snapshot.graph.nodes.map(node => [node.id, node])), [snapshot])
-  const visibleEdges = useMemo(() => snapshot.graph.edges.filter(edge =>
-    connectionKind === 'all' || edge.kind.startsWith(connectionKind)), [connectionKind, snapshot])
-  const connections = selected
-    ? visibleEdges.filter(edge => edge.target === selected.id || edge.source === selected.id)
-    : []
-
-  const visibleNodes = useMemo(() => {
-    const specific = mode === 'all' || kind === 'function' || connectionKind === 'calls' || query.trim()
-    let nodes = snapshot.graph.nodes.filter(node => specific || node.kind !== 'function')
-    if (kind !== 'all') {
-      const wanted = new Set(nodes.filter(node => node.kind === kind).map(node => node.id))
-      for (const edge of snapshot.graph.edges) {
-        if (allNodes.get(edge.source)?.kind === kind || allNodes.get(edge.target)?.kind === kind) {
-          wanted.add(edge.source)
-          wanted.add(edge.target)
-        }
-      }
-      nodes = nodes.filter(node => wanted.has(node.id))
-    }
-    return nodes
-  }, [snapshot, mode, kind, allNodes, query, connectionKind])
 
   useEffect(() => {
     const cy = graph.current
     if (!cy) return
-    const visible = new Set(visibleNodes.map(node => node.id))
+    const renderedNodes = focused ? focused.nodes : overview.nodes
+    const renderedEdges = focused ? focused.edges : overview.edges
+    const coordinates = (node: Node, index: number) => {
+      if (!focused) return { x: width * ((index % columns) + .5) / columns,
+        y: height / 2 + (Math.floor(index / columns) - (rows - 1) / 2) * 81 }
+      if (node.id === selected?.id) return { x: width / 2, y: horizontal ? height / 2 : 49 }
+      if (horizontal) {
+        const side = focused.incoming.includes(node.id) ? focused.incoming : focused.outgoing
+        return { x: width * (side === focused.incoming ? .175 : .825),
+          y: height / 2 + (side.indexOf(node.id) - (side.length - 1) / 2) * 81 }
+      }
+      return { x: width * (((index - 1) % columns) + .5) / columns, y: 129 + Math.floor((index - 1) / columns) * 81 }
+    }
+    cy.resize()
     cy.batch(() => {
       cy.elements().remove()
-      cy.add(visibleNodes.map(node => ({
-        data: { id: node.id, label: node.label, kind: node.kind, color: colors[node.kind], payload: node },
-      })))
-      cy.add(visibleEdges.filter(edge => visible.has(edge.source) && visible.has(edge.target)).map((edge, index) => ({
+      cy.add(renderedNodes.map((node, index) => {
+        const count = 'count' in node && node.count ? '  ·  ' + node.count : ''
+        return { data: { id: node.id, label: node.label + count, color: colors[node.kind] ?? colors.file,
+          center: node.id === selected?.id ? 'yes' : 'no', width: nodeWidth, textWidth: nodeWidth - 18, payload: node },
+        position: coordinates(node, index) }
+      }))
+      cy.add(renderedEdges.map((edge, index) => ({
         data: { id: 'edge-' + index, source: edge.source, target: edge.target, kind: edge.kind, payload: edge },
       })))
     })
-    if (cy.nodes().length) {
-      cy.layout({ name: cy.nodes().length > 100 ? 'grid' : 'breadthfirst', directed: true, padding: 55, spacingFactor: 1.2 }).run()
-      if (cy.zoom() > 1.15) cy.zoom(1.15)
-      cy.center()
+    cy.viewport({ zoom: 1, pan: { x: 0, y: 0 } })
+  }, [overview, focused, selected, nodeWidth, columns, width, height, horizontal, rows])
+
+  function resetScope(next: string) {
+    setScope(next); setPage(0); setSelected(null); setEdgeDetail('')
+    setBrowse(false); setQuery(''); setKind('all'); setFilter('all')
+  }
+
+  function selectNode(node: Node) {
+    if (node.kind === 'folder') {
+      resetScope(node.id)
+      requestAnimationFrame(() => canvasTitle.current?.focus())
+      return
     }
-  }, [visibleEdges, visibleNodes])
-
-  useEffect(() => {
-    const cy = graph.current
-    if (!cy) return
-    const needle = query.trim().toLowerCase()
-    cy.nodes().forEach(node => {
-      const item = node.data('payload') as Node
-      const match = !!needle && (item.label + ' ' + (item.path ?? '')).toLowerCase().includes(needle)
-      node.toggleClass('match', match)
-      node.toggleClass('dim', !!needle && !match)
-    })
-  }, [query, visibleNodes])
-
-  useEffect(() => {
-    if (selected) graph.current?.getElementById(selected.id).select()
-  }, [selected, visibleNodes])
-
-  useEffect(() => {
-    const block = sourceBlock.current
-    const line = block?.querySelector<HTMLElement>('.highlight-line')
-    if (block && line) block.scrollTop = line.offsetTop - block.offsetTop - 30
-  }, [preview, highlight])
+    const actual = allNodes.get(node.id)
+    if (actual) {
+      setSelected(actual); setFilter('all'); setBrowse(false); setEdgeDetail('')
+      requestAnimationFrame(() => inspectorTitle.current?.focus())
+      return
+    }
+    setQuery(''); setKind(node.kind); setBrowse(true)
+    requestAnimationFrame(() => searchInput.current?.focus())
+  }
 
   async function showSource(path: string, line: number | null) {
     const sequence = ++previewSeq.current
-    setPreviewError('')
-    setHighlight(line)
-    setLoading(true)
-    setDraft(null)
-    setPreview(null)
+    setPreviewError(''); setPreview(null); setDraft(null); setHighlight(line); setLoading(true)
     try {
       const next = await api<Source>((scanId ? '/scans/' + scanId : '/sample') + '/source?path=' + encodeURIComponent(path))
       if (previewSeq.current === sequence) setPreview(next)
@@ -148,94 +163,138 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
     }
   }
 
-  function selectNode(node: Node) {
-    setSelected(node)
-    setShowList(false)
-    if (node.path && snapshot.preview_paths.includes(node.path)) void showSource(node.path, node.line)
-  }
-
   useEffect(() => {
     const cy = graph.current
     if (!cy) return
+    const onNode = (event: cytoscape.EventObject) => selectNode(event.target.data('payload') as Node)
     const onEdge = (event: cytoscape.EventObject) => {
-      const edge = event.target.data('payload') as Edge
-      setSelected(allNodes.get(edge.target) ?? null)
-      if (edge.line && snapshot.preview_paths.includes(edge.path)) void showSource(edge.path, edge.line)
+      const edge = event.target.data('payload') as DrawnEdge
+      const [from, to] = [edge.source, edge.target].map(id => cy.getElementById(id).data('payload') as Node)
+      setEdgeDetail(from.label + ' → ' + to.label + ' · ' + relationLabel(edge))
+      if ('path' in edge && edge.line && snapshot.preview_paths.includes(edge.path)) void showSource(edge.path, edge.line)
     }
-    cy.on('tap', 'edge', onEdge)
-    return () => { cy.off('tap', 'edge', onEdge) }
+    cy.on('tap', 'node', onNode).on('tap', 'edge', onEdge)
+    return () => { cy.off('tap', 'node', onNode).off('tap', 'edge', onEdge) }
   }, [allNodes, snapshot.preview_paths, scanId])
 
-  function zoom(scale: number) {
+  useEffect(() => {
+    const block = sourceBlock.current
+    const line = block?.querySelector<HTMLElement>('.highlight-line')
+    if (block && line) block.scrollTop = line.offsetTop - block.offsetTop - 30
+    if (preview) {
+      previewTitle.current?.focus({ preventScroll: true })
+      previewTitle.current?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [preview, highlight])
+
+  function zoom(factor: number) {
     const cy = graph.current
-    if (cy) cy.zoom({ level: cy.zoom() * scale, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
+    if (cy) cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
   }
 
-  const list = visibleNodes.filter(node => (node.label + ' ' + (node.path ?? '')).toLowerCase().includes(query.toLowerCase()))
-  const link = (edge: Edge) => {
-    const incoming = edge.target === selected?.id
-    const target = allNodes.get(incoming ? edge.source : edge.target)
-    return <div className="edge-row" key={[edge.source, edge.target, edge.kind].join('|')}>
-      <button className="text-button" onClick={() => target && selectNode(target)}>{target?.label ?? 'Unknown'}</button>
-      <span>{incoming ? '←' : '→'} {edge.kind}</span>
-      {edge.line && snapshot.preview_paths.includes(edge.path) &&
-        <button className="icon-button tiny" onClick={() => void showSource(edge.path, edge.line)}
-          aria-label={'Open connection source line ' + edge.line}><ArrowUpRight size={14} /></button>}
-    </div>
+  function connectionList(title: string, edges: Edge[], incoming: boolean) {
+    return <section className="connection-list"><h4>{title} <span>{edges.length}</span></h4>
+      {edges.length ? edges.map(edge => {
+        const target = allNodes.get(incoming ? edge.source : edge.target)
+        if (!target) return null
+        return <div className="connection-row" key={JSON.stringify([edge.source, edge.target, edge.kind, edge.path, edge.line])}>
+          <button className="connection-target" onClick={() => selectNode(target)}><strong>{target.label}</strong>
+            <small>{relationLabel(edge)}</small></button>
+          {edge.line && snapshot.preview_paths.includes(edge.path) && <button className="icon-button"
+            onClick={() => void showSource(edge.path, edge.line)} aria-label={'Open ' + edge.path + ':' + edge.line}><ArrowUpRight size={15} /></button>}
+        </div>
+      }) : <p>No indexed connections.</p>}
+    </section>
   }
 
   return <section className="graph-card" aria-label="Interactive code structure">
     <div className="graph-toolbar">
-      <label className="search-field"><MagnifyingGlass size={16} /><input value={query} onChange={event => {
-        setQuery(event.target.value)
-        if (event.target.value) setShowList(true)
-      }} placeholder="Find a file or function" aria-label="Find a file or function" /></label>
-      <label className="select-field"><FunnelSimple size={16} /><select aria-label="Filter graph node type" value={kind}
-        onChange={event => setKind(event.target.value)}><option value="all">All types</option>
-        {types.map(type => <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>)}</select></label>
-      <label className="select-field"><select aria-label="Filter graph connections" value={connectionKind}
-        onChange={event => setConnectionKind(event.target.value)}><option value="all">All connections</option>
-        <option value="imports">Imports</option><option value="calls">Function calls</option>
-        <option value="contains">Folder structure</option><option value="defines">Definitions</option></select></label>
-      <button className="button compact" onClick={() => setMode(mode === 'files' ? 'all' : 'files')} aria-pressed={mode === 'all'}>
-        {mode === 'all' ? 'Hide functions' : 'Show functions'}
+      <label className="search-field graph-search"><MagnifyingGlass size={17} /><input ref={searchInput}
+        value={query} onChange={event => { setQuery(event.target.value); setBrowse(true) }}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && matches[0]) { event.preventDefault(); selectNode(matches[0]) }
+          if (event.key === 'Escape') setBrowse(false)
+        }} placeholder="Find a file, function, or package" aria-label="Find a file, function, or package" /></label>
+      <label className="select-field"><select aria-label="Filter graph connections" value={filter}
+        onChange={event => { setFilter(event.target.value); setEdgeDetail('') }}>
+        <option value="all">All connections</option><option value="imports">Imports</option>
+        <option value="calls">Function calls</option>
+        {selected && <><option value="contains">Folder structure</option><option value="defines">Definitions</option></>}
+      </select></label>
+      <button className="button compact" onClick={() => setBrowse(!browse)} aria-expanded={browse}>
+        <ListBullets size={17} /> {browse ? 'Hide list' : 'Browse nodes'}
       </button>
-      <button className="button compact graph-list-button" onClick={() => setShowList(!showList)} aria-expanded={showList}>
-        {showList ? 'Hide list' : 'Node list'}
-      </button>
+    </div>
+    {browse && <section className="graph-browse" aria-label="Graph node browser">
+      <div className="split"><h4>{matches.length} {query ? 'matches' : 'indexed nodes'}</h4>
+        <label className="select-field"><select aria-label="Filter graph node type" value={kind} onChange={event => setKind(event.target.value)}>
+          <option value="all">All node types</option>{types.map(type => <option key={type} value={type}>{typeName(type)}</option>)}
+        </select></label></div>
+      <div className="graph-results">
+        {matches.length ? matches.slice(0, 50).map(node => <button key={node.id} onClick={() => selectNode(node)}>
+          <span className="color-dot" style={{ background: colors[node.kind] }} /><strong>{node.label}</strong>
+          <small>{node.path ?? node.kind}</small><ArrowRight size={14} />
+        </button>) : <p>No matching nodes. Try a different name or node type.</p>}
+      </div>
+      {matches.length > 50 && <p>Showing 50 of {matches.length}. Search to narrow the list.</p>}
+    </section>}
+    <div className="graph-heading">
+      <div>
+        <div className="graph-crumb" aria-label="Graph location">
+          {selected || scope ? <button className="text-button" onClick={() => resetScope(selected ? scope : parentScope(scope))}>
+            <ArrowLeft size={15} /> {selected ? 'Back to overview' : 'Up one level'}</button> : <span><Graph size={16} /> Repository overview</span>}
+          {scope && <span>{scopeName(scope)}</span>}
+        </div>
+        <h3 tabIndex={-1} ref={canvasTitle}>{selected?.label ?? (scope ? scopeName(scope) : 'Repository structure')}</h3>
+        <p>{selected ? 'Direct connections around this node' : 'Select a folder to drill down, or search for a specific node.'}</p>
+      </div>
+      {!selected && overview.total > PAGE_SIZE && <div className="graph-pages">
+        <button className="icon-button" disabled={page === 0} onClick={() => setPage(page - 1)} aria-label="Previous graph page"><ArrowLeft size={16} /></button>
+        <span>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, overview.total)} of {overview.total}</span>
+        <button className="icon-button" disabled={(page + 1) * PAGE_SIZE >= overview.total}
+          onClick={() => setPage(page + 1)} aria-label="Next graph page"><ArrowRight size={16} /></button>
+      </div>}
     </div>
     <div className={'graph-grid' + (selected ? ' selected' : '')}>
       <div className="map">
-        <div className="canvas" aria-hidden="true" ref={container} />
-        {!visibleNodes.length && <p className="canvas-empty">No graph nodes available for this selection.</p>}
-        {showList && <div className="node-list" aria-label="Graph nodes">
-          {list.length ? list.map(node => <button key={node.id} onClick={() => { selectNode(node); requestAnimationFrame(() => inspectorTitle.current?.focus()) }}>
-            <span className="color-dot" style={{ background: colors[node.kind] }} />{node.label}<small>{node.path ?? node.kind}</small>
-          </button>) : <p>No matching nodes.</p>}
-        </div>}
+        <div className="canvas" style={{ height }} aria-hidden="true" ref={container} />
+        {!nodes.length && <p className="canvas-empty">No indexed nodes in this view.</p>}
+        {selected && <div className="map-directions">{horizontal ? <><span>Incoming</span><span>Outgoing</span></>
+          : <span>Selected node above its neighbors</span>}</div>}
         <div className="zoom-controls">
-          <button className="icon-button" aria-label="Zoom in" onClick={() => zoom(1.3)}><Plus size={17} /></button>
-          <button className="icon-button" aria-label="Zoom out" onClick={() => zoom(0.77)}><Minus size={17} /></button>
-          <button className="icon-button" aria-label="Fit graph" onClick={() => graph.current?.fit(undefined, 55)}><ArrowsOutSimple size={17} /></button>
+          <button className="icon-button" aria-label="Zoom in" onClick={() => zoom(1.2)}><Plus size={17} /></button>
+          <button className="icon-button" aria-label="Zoom out" onClick={() => zoom(.83)}><Minus size={17} /></button>
+          <button className="icon-button" aria-label="Reset graph view" onClick={() => graph.current?.viewport({ zoom: 1, pan: { x: 0, y: 0 } })}><ArrowsOutSimple size={17} /></button>
         </div>
       </div>
-      {selected && <aside className="node-inspector" aria-label="Graph node details">
-        <div className="split"><span className="eyebrow">{selected.kind}</span>
-          <button className="icon-button" aria-label="Close node details" onClick={() => { setSelected(null); graph.current?.nodes().unselect() }}><X size={16} /></button>
+      {selected && focused && <aside className="node-inspector" aria-label="Graph node details">
+        <div className="split"><span className="eyebrow">{typeName(selected.kind)}</span>
+          <button className="icon-button" aria-label="Close node details" onClick={() => { resetScope(scope); searchInput.current?.focus() }}><X size={16} /></button>
         </div>
         <h3 tabIndex={-1} ref={inspectorTitle}>{selected.label}</h3>
-        <p className="mono word-wrap">{selected.path}</p>
-        {selected.path && snapshot.preview_paths.includes(selected.path) && <button className="button compact"
-          onClick={() => void showSource(selected.path!, selected.line)}>Open source</button>}
-        <h4>Connections</h4>
-        {connections.length ? connections.map(link) : <p>No indexed connections.</p>}
+        {selected.path && <p className="mono word-wrap">{selected.path}</p>}
+        {sourceAvailable(selected, snapshot) && <button className="button compact" onClick={() => void showSource(selected.path!, selected.line)}>
+          <Code size={16} /> Open source</button>}
+        {connectionList('Incoming', focused.relevant.filter(edge => edge.target === selected.id), true)}
+        {connectionList('Outgoing', focused.relevant.filter(edge => edge.source === selected.id && edge.target !== selected.id), false)}
       </aside>}
     </div>
-    <div className="legend">{types.map(type => <span key={type}><i style={{ background: colors[type] }} />{type}</span>)}
-      <span>{snapshot.graph.unresolved} unresolved{snapshot.graph.limited ? ' · node limit reached' : ''}</span>
+    <div className="legend">
+      <div>{types.map(type => <span key={type}><i style={{ background: colors[type] }} />{typeName(type)}</span>)}</div>
+      <span>{nodes.length} shown{focused?.hidden ? ' · ' + focused.hidden + ' more in details' : ''}
+        {!focused && overview.hidden ? ' · ' + overview.hidden + ' additional folder links' : ''}</span>
     </div>
-    {(preview || loading || previewError) && <section className="preview">
-      <div className="split"><div><h3>{preview?.path ?? 'Source preview'}</h3>
+    {(edgeDetail || snapshot.graph.unresolved > 0 || snapshot.graph.limited) && <div className="graph-note" role="status">
+      {edgeDetail || [snapshot.graph.unresolved ? snapshot.graph.unresolved + ' connections could not be resolved from the source sample' : '',
+        snapshot.graph.limited ? 'Graph index limit reached' : ''].filter(Boolean).join(' · ')}
+    </div>}
+    {!selected && <div className="graph-shortcuts" aria-label="Nodes in this view">
+      {overview.nodes.map(node => <button key={node.id} onClick={() => selectNode(node)}>
+        {node.kind === 'folder' ? <FolderSimple size={15} /> : <ArrowRight size={14} />} {node.label}
+      </button>)}
+    </div>}
+    {(preview || loading || previewError) && <section className="preview" aria-label="Source preview">
+      <div className="split"><div><h3 tabIndex={-1} ref={previewTitle}>{preview?.path ?? 'Source preview'}</h3>
         {preview?.url && <a href={preview.url} target="_blank" rel="noreferrer">Open pinned file on GitHub <ArrowUpRight size={14} /></a>}</div>
         <div className="inline-buttons">{preview && <button className="button compact" onClick={() => setDraft(draft === null ? preview.source : null)}>
           {draft === null ? 'Open scratch draft' : 'Discard draft'}</button>}
@@ -243,7 +302,7 @@ export function CodeGraph({ snapshot, scanId }: { snapshot: Snapshot; scanId: st
             previewSeq.current++; setPreview(null); setLoading(false); setDraft(null); setPreviewError('')
           }}><X size={16} /></button></div>
       </div>
-      {loading && <p>Fetching pinned source…</p>}{previewError && <p role="alert">{previewError}</p>}
+      {loading && <p role="status">Fetching pinned source…</p>}{previewError && <p role="alert">{previewError}</p>}
       {draft !== null ? <label className="draft-field">Local scratch draft<textarea value={draft}
         aria-label="Local scratch draft" onChange={event => setDraft(event.target.value)} spellCheck={false} /></label>
         : preview && <pre ref={sourceBlock}>{preview.source.split('\n').map((line, index) => <span key={index} className={highlight === index + 1 ? 'highlight-line' : ''}>

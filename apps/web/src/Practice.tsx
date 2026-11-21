@@ -1,5 +1,5 @@
 
-import { ArrowRight, CheckCircle, Code, FloppyDisk, Play, XCircle } from '@phosphor-icons/react'
+import { ArrowRight, CheckCircle, Code, FloppyDisk, MagnifyingGlass, Play, XCircle } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { api, errorText } from './api'
 
@@ -37,6 +37,8 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [recommendation, setRecommendation] = useState<Recommendation['next']>(null)
+  const [query, setQuery] = useState('')
+  const [difficulty, setDifficulty] = useState('all')
 
   useEffect(() => {
     let alive = true
@@ -57,6 +59,9 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
   const draftKey = selected + ':' + language
   const code = drafts[draftKey] ?? starters[language]
   const currentAttempts = attempts.filter(item => item.problem === selected)
+  const completed = new Set(attempts.filter(item => item.total > 0 && item.passed === item.total).map(item => item.problem))
+  const visible = catalog.filter(item => (difficulty === 'all' || item.difficulty === difficulty) &&
+    item.title.toLowerCase().includes(query.trim().toLowerCase()))
 
   async function run(examplesOnly: boolean) {
     if (!problem || !code.trim() || busy) return
@@ -86,21 +91,29 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
 
   const output = problemHistory ?? result
   return <section className="ranking-page practice">
-    <p className="eyebrow"><span className="accent-square" /> Applied practice</p>
-    <h1>Coding tests<span>.</span></h1>
-    <p>Work through everyday engineering problems using data structures and algorithms.</p>
+    <h1>Coding practice<span>.</span></h1>
+    <p>Choose an engineering scenario, write a solution, and check it against example and hidden cases.</p>
     {error && <p className="notice" role="alert">{error}</p>}
     {loading && <div className="status-panel" role="status">Loading exercises…</div>}
     {!loading && <div className="practice-grid">
-      <aside className="library practice-library"><h2>Exercise catalog</h2>
+      <aside className="library practice-library"><div className="split"><h2>Exercises</h2><span className="practice-count">{completed.size}/{catalog.length} solved</span></div>
+        <label className="search-field"><MagnifyingGlass size={16} /><input value={query} placeholder="Search exercises" aria-label="Search exercises"
+          onChange={event => setQuery(event.target.value)} /></label>
+        <label className="select-field"><select value={difficulty} onChange={event => setDifficulty(event.target.value)} aria-label="Filter exercises by difficulty">
+          <option value="all">All difficulties</option>{[...new Set(catalog.map(item => item.difficulty))].map(level => <option key={level}>{level}</option>)}
+        </select></label>
         {recommendation && recommendation.problem !== selected && <button className="button compact" disabled={!!busy}
           onClick={() => select(recommendation.problem)}>Recommended next · {recommendation.difficulty}</button>}
-        {catalog.map(item => <button disabled={!!busy} key={item.id} className={'library-item' + (selected === item.id ? ' active' : '')}
-          onClick={() => select(item.id)}><Code size={17} /><span><strong>{item.title}</strong><small>{item.difficulty}</small></span></button>)}
+        {visible.map(item => <button disabled={!!busy} key={item.id} className={'library-item' + (selected === item.id ? ' active' : '')}
+          aria-pressed={selected === item.id} onClick={() => select(item.id)}>
+          {completed.has(item.id) ? <CheckCircle size={17} /> : <Code size={17} />}
+          <span><strong>{item.title}</strong><small>{item.difficulty}{completed.has(item.id) ? ' · Solved' : ''}</small></span></button>)}
+        {!visible.length && <p className="practice-count">No exercises match these filters.</p>}
       </aside>
       {problem && <div className="practice-detail">
-        <section className="panel challenge">
-          <p className="eyebrow">{problem.difficulty} · v{problem.version}</p><h2>{problem.title}</h2>
+        <div className="practice-workbench">
+        <section className="panel challenge challenge-statement">
+          <p className="eyebrow">{problem.difficulty}</p><h2>{problem.title}</h2>
           <p>{problem.story}</p>
           <h3>Input and output</h3><p>{problem.contract}</p>
           <p className="subtle">Read one JSON value from standard input. Print one JSON value to standard output.</p>
@@ -109,7 +122,7 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
             <div><h4>Expected output</h4><pre>{JSON.stringify(item.output, null, 2)}</pre></div>
           </div>)}
         </section>
-        <section className="panel challenge">
+        <section className="panel challenge challenge-editor">
           <div className="split"><h3>Solution editor</h3><label className="select-field">Language
             <select value={language} disabled={!!busy} onChange={event => { setLanguage(event.target.value as Language); setResult(null); setProblemHistory(null) }}>
               {problem.languages.map(item => <option value={item} key={item}>{item === 'python' ? 'Python' : 'JavaScript'}</option>)}
@@ -124,6 +137,7 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
           {busy && <p className="subtle" role="status">Evaluating {busy === 'example' ? 'examples' : 'your submission'}…</p>}
           {!enabled && <p className="subtle" role="status">The exercise catalog is available. Code execution requires a connected isolated evaluator.</p>}
         </section>
+        </div>
         {output && <section className="panel challenge results" aria-live="polite">
           <div className="split"><h3>{output.examples_only ? 'Example run' : 'Submission result'}</h3>
             <strong>{output.passed}/{output.total} passed</strong></div>
