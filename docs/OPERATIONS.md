@@ -1,6 +1,14 @@
 
 # Running SkillForge
 
+## Windows launcher
+
+Double-click [Run-SkillForge.bat](../Run-SkillForge.bat), or run it from a terminal. It checks Node.js and npm, uses uv to prepare Python 3.12 and the locked API dependencies, and installs the locked web dependencies when needed. The first run may require internet access. It rebuilds the website, serves it with the API at a single loopback URL, and opens the browser after verifying the API, database and web build. Keep the terminal open while using the app and press Ctrl+C to stop it.
+
+The launcher tries port 8765 first and then checks the next 19 ports. In PowerShell, use `.\Run-SkillForge.bat --port 8765` to require a specific port. Add `--no-browser` to print the URL only, `--check` to verify startup with a temporary database and stop, or `--reinstall` to repair web dependencies.
+
+Local data is saved in the ignored `.skillforge.db` file. For optional GitHub, Gemini or judge settings, copy `.env.example` to `.env.local` and fill in the integrations you want to use. The launcher reads `.env.local` and sets the origin, local SQLite database, scan worker and GitHub callback for the current run. If you use GitHub sign-in, pin the port and register the callback printed by the launcher. The practice catalog works locally and code submissions become available when you configure a compatible isolated evaluator.
+
 ## Local development
 
 Use Node 22.12 or later, Python 3.12 and uv. Install the locked frontend and backend dependencies from their respective directories. Start the API and web app in separate terminals.

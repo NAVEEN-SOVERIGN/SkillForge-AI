@@ -4,6 +4,8 @@ SkillForge Integrated helps students, developers, and working professionals rank
 
 The workspace includes public GitHub scans, an interactive code graph, project-aware repository rankings, scenario coding tests, and a portfolio and learning plan. Read the [configuration and deployment guide](docs/OPERATIONS.md) to run the app and enable live integrations.
 
+On Windows, double-click [Run-SkillForge.bat](Run-SkillForge.bat) to build and open the local app. The launcher needs Node.js 22.12 or newer and uv.
+
 - [Product requirements](docs/PRD.md)
 - [Build plan and release gates](docs/BUILD_PLAN.md)
 - [Source review and feature inventory](docs/SOURCE_INVENTORY.md)

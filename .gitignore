@@ -17,3 +17,4 @@ playwright-report/
 test-results/
 *.log
 .skillforge.db*
+.skillforge-local/
