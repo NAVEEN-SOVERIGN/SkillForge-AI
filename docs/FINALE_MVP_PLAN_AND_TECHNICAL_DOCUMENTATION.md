@@ -32,31 +32,15 @@ Complete primary and one additional segment journey; validate demand through thr
 
 **Sarvam AI speech-to-text** is planned to let a developer ask repository questions by voice, including Indian-language or code-switched speech where the selected Sarvam model supports it. It addresses the friction of typing a precise question while exploring a codebase and provides a more accessible question-entry path. The microphone is part of the core query journey, not a standalone API demo. The transcript is shown for correction before submission. The exact model, supported languages, API contract and latency are not yet confirmed against current provider documentation and credentials.
 
-### Hour-by-hour gates
+### General 22-hour delivery plan
 
-| Time (IST) | Build / validation gate |
+| Phase | Focus and exit evidence |
 |---|---|
-| **21 Nov, 2–4 PM** | Audit, choose one primary journey, agree scope and risks; submit the one-page plan by **4 PM**. |
-| 4–5 PM | Validate platform/device/toolchain; record code, asset and repository reuse rights; freeze API/data boundaries; capture baseline build, tests and known journey failures. |
-| 5–6 PM | Create native shell around existing React app; confirm app launch, deep links and permissions on the chosen device. |
-| 6–7 PM | Implement Sarvam server proxy/configuration and secure secret handling. |
-| 7–8 PM | Add voice capture, recording states, transcript and edit/submit affordance. |
-| 8–9 PM | Connect transcript to repository question flow; keep typed path as fallback. |
-| 9–10 PM | Add timeout, denial, empty audio, provider/network failure and retry handling. |
-| 10–11 PM | Complete one additional segment journey and verify source links/ADR evidence. |
-| 11 PM–12 AM | Run the ArgosX baseline scan; download report by **midnight**. |
-| **22 Nov, 12–1 AM** | Triage scan findings; create remediation log with severity, location, action and status. |
-| 1–2 AM | Fix critical findings; rerun focused checks. |
-| 2–3 AM | Fix high findings; record justified residual findings without hiding them. |
-| 3–4 AM | Check auth boundaries, secret exposure, request validation, upload/input limits and rate limiting; verify GitHub calls remain on approved API hosts, including redirects. |
-| 4–5 AM | Test the primary repository question and evidence path on a fresh evaluator profile. |
-| 5–6 AM | Test Guardrail, Déjà Vu, graph/time view and ADR export; document any sample/history limits. |
-| 6–7 AM | Test native install/launch and permission/network failure behavior on the target device. |
-| 7–8 AM | Run typecheck, production build and focused automated tests; fix regressions. |
-| 8–9 AM | Run three customer tests; capture assumptions, findings and changes with consent. |
-| 9–10 AM | Fill Market Fit Canvas from interview/source evidence; verify claims and first user/payer assumptions. |
-| 10–11 AM | Deploy candidate; smoke test live URL/native build; run final ArgosX scan by **11 AM**. |
-| 11 AM–12 PM | Download final scan, complete remediation log, rehearse evaluator journey and submit by **12 PM**. |
+| **Baseline and scope** | Audit the prototype, confirm reuse rights and platform/device feasibility, capture current build/test behavior, and lock the primary user journey and API boundaries. Submit the plan by **4 PM, 21 Nov**. |
+| **Core build and partner integration** | Package the existing React experience in the selected native shell if toolchain checks pass; integrate Sarvam STT into the question flow with editable transcript and typed fallback; complete the primary and one additional persona journey. Keep provider credentials server-side. |
+| **Security baseline and remediation** | Run ArgosX against the app/API by **midnight, 21 Nov**; download the report, triage findings, fix critical/high issues first, retest, and document residual risks. Include auth, input limits, secret handling, API host/redirect restrictions and provider failure cases. |
+| **Validation and hardening** | Run three target-user conversations; record assumptions, observed evidence and resulting product changes. Exercise typed/voice journeys, evidence citations, guardrail, Déjà Vu, graph/time view, ADR export, native permissions, network failures and mobile/accessibility states. Run typecheck, automated tests and production build. |
+| **Release and submission** | Deploy and smoke-test the candidate; complete the final ArgosX scan and download its report by **11 AM, 22 Nov**. Finish the remediation log, confirm the evaluator can use the product, and submit the live build and required reports by **12 PM, 22 Nov**. |
 
 **Definition of done:** By 12:00 PM on 22 November, an evaluator can launch the deployed web/native experience, ask a public-repository question by text or Sarvam voice, inspect cited evidence and a pre-merge history result, complete one second-segment use case, and review the two ArgosX reports plus a truthful remediation and market-validation record.
 
