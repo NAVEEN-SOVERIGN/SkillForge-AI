@@ -1,34 +1,36 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import {
   LayoutDashboard,
   User,
+  FolderGit2,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Network,
+  Search,
+  Hammer,
   Compass,
   GitCompare,
   FileSearch,
   Milestone,
   CalendarDays,
   Bot,
-  FolderGit2,
   Award,
   BarChart3,
   FileText,
-  Settings,
-  LogOut,
-  ChevronRight,
   Swords,
   Fingerprint,
   ShieldCheck,
-  Network,
   TrendingUp,
   Radio,
   Briefcase,
-  Hammer,
   Rocket,
   GraduationCap,
   FlaskConical
 } from 'lucide-react';
+import { BrandMark } from './BrandMark.js';
 
 export const Sidebar: React.FC = () => {
   const { user, profile, logout } = useAuth();
@@ -37,12 +39,23 @@ export const Sidebar: React.FC = () => {
 
   const navSections = [
     {
-      title: 'Overview',
+      title: 'Code Context',
       items: [
-        { to: '/dashboard', label: 'Main Dashboard', icon: LayoutDashboard },
-        { to: '/profile', label: 'Student Profile', icon: User },
+        { to: '/code-context', label: 'Ask why', icon: Search },
+        { to: '/portfolio-intelligence', label: 'Repository portfolio', icon: FolderGit2 },
+        { to: '/evidence-graph', label: 'Evidence graph', icon: Network },
       ]
     },
+    {
+      title: 'My SkillForge',
+      items: [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/project-forge', label: 'Project Forge', icon: Hammer },
+      ]
+    }
+  ];
+
+  const moreSections = [
     {
       title: 'Career Intelligence',
       items: [
@@ -50,13 +63,7 @@ export const Sidebar: React.FC = () => {
         { to: '/opportunity-match', label: 'Opportunity Match', icon: Briefcase },
         { to: '/analysis', label: 'Skill Gap Analysis', icon: GitCompare },
         { to: '/jd-analyzer', label: 'Job Description Analyzer', icon: FileSearch },
-      ]
-    },
-    {
-      title: 'Skill Development',
-      items: [
         { to: '/proof-of-skill', label: 'Proof of Skill', icon: Award },
-        { to: '/project-forge', label: 'Project Forge', icon: Hammer },
         { to: '/interview-arena', label: 'Interview Arena', icon: Swords },
         { to: '/roadmap', label: 'Learning Roadmap', icon: Milestone },
         { to: '/assessments', label: 'Skill Verification', icon: GraduationCap },
@@ -90,6 +97,7 @@ export const Sidebar: React.FC = () => {
         { to: '/careers', label: 'Career Selection', icon: Compass },
         { to: '/report', label: 'Readiness Report', icon: FileText },
         { to: '/analytics', label: 'Progress Analytics', icon: BarChart3 },
+        { to: '/profile', label: 'Student Profile', icon: User },
         { to: '/settings', label: 'Settings', icon: Settings },
       ]
     }
@@ -113,6 +121,7 @@ export const Sidebar: React.FC = () => {
     >
       {/* Brand Header */}
       <div
+        className="sidebar-brand-header"
         style={{
           padding: '1.25rem 1.5rem',
           borderBottom: '1px solid var(--border-subtle)',
@@ -122,13 +131,13 @@ export const Sidebar: React.FC = () => {
           gap: '0.75rem'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} aria-label="SkillForge home" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
           <div
             style={{
               width: 34,
               height: 34,
               borderRadius: 8,
-              background: 'var(--color-paper-light)',
+              background: 'linear-gradient(145deg, #174e4d, #126b68)',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
@@ -136,14 +145,7 @@ export const Sidebar: React.FC = () => {
               boxShadow: '0 1px 4px rgba(48, 35, 25, 0.08)'
             }}
           >
-            <svg width="22" height="22" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M11 11H15C15 9.34 16.34 8 18 8C19.66 8 21 9.34 21 11H23C24.1 11 25 11.9 25 13V15C26.66 15 28 16.34 28 18C28 19.66 26.66 21 25 21V23C25 24.1 24.1 25 23 25H21C21 23.34 19.66 22 18 22C16.34 22 15 23.34 15 25H11C9.9 25 9 24.1 9 23V19C10.66 19 12 17.66 12 16C12 14.34 10.66 13 9 13V13C9 11.9 9.9 11 11 11Z"
-                fill="#D38A19"
-                stroke="#B3700E"
-                strokeWidth="0.8"
-              />
-            </svg>
+            <BrandMark size={27} />
           </div>
           <div>
             <span style={{ fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)' }}>
@@ -151,7 +153,14 @@ export const Sidebar: React.FC = () => {
             </span>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Career Intelligence</div>
           </div>
-        </div>
+        </Link>
+
+        <nav className="sidebar-quick-nav" aria-label="Quick navigation">
+          <NavLink to="/dashboard" title="Dashboard" onClick={() => setMobileMenuOpen(false)}><LayoutDashboard size={16} /><span>Home</span></NavLink>
+          <NavLink to="/code-context" title="Ask why" onClick={() => setMobileMenuOpen(false)}><Search size={16} /><span>Ask why</span></NavLink>
+          <NavLink to="/roadmap" title="Learning roadmap" onClick={() => setMobileMenuOpen(false)}><Milestone size={16} /><span>Roadmap</span></NavLink>
+          <NavLink to="/project-forge" title="Build a project" onClick={() => setMobileMenuOpen(false)}><Hammer size={16} /><span>Build</span></NavLink>
+        </nav>
 
         {/* Mobile toggle button */}
         <button
@@ -207,6 +216,7 @@ export const Sidebar: React.FC = () => {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={() => setMobileMenuOpen(false)}
                   style={({ isActive }) => ({
                     display: 'flex',
                     alignItems: 'center',
@@ -233,6 +243,22 @@ export const Sidebar: React.FC = () => {
             })}
           </div>
         ))}
+        <details style={{ margin: '.3rem 0 .5rem', padding: '0 .4rem' }}>
+          <summary style={{ cursor: 'pointer', padding: '.55rem .35rem', color: 'var(--text-muted)', fontSize: '.78rem', fontWeight: 650 }}>More SkillForge tools</summary>
+          {moreSections.map(section => (
+            <div key={section.title} style={{ margin: '.35rem 0' }}>
+              <div style={{ fontSize: '.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-muted)', padding: '.35rem .4rem' }}>{section.title}</div>
+              {section.items.map(item => {
+                const Icon = item.icon;
+                return (
+                  <NavLink key={item.to} to={item.to} onClick={() => setMobileMenuOpen(false)} style={({ isActive }) => ({ display: 'flex', alignItems: 'center', gap: '.65rem', padding: '.45rem .65rem', borderRadius: 'var(--radius-md)', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', background: isActive ? 'rgba(211, 138, 25, 0.14)' : 'transparent', fontSize: '.8rem', textDecoration: 'none' })}>
+                    <Icon size={15} /><span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
+        </details>
       </nav>
 
       {/* User Footer Profile Card */}

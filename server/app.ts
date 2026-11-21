@@ -30,6 +30,7 @@ import { missionControlRouter } from './routes/missionControl.js';
 import { aiProviderRouter } from './routes/aiProvider.js';
 import { autopilotRouter } from './routes/autopilot.js';
 import { experimentRouter } from './routes/experiment.js';
+import { codeContextRouter } from './routes/codeContext.js';
 
 /**
  * Builds the Express application without binding to a port.
@@ -103,6 +104,7 @@ export function createApp(): express.Express {
   app.use('/api/ai-provider', aiProviderRouter);
   app.use('/api/autopilot', autopilotRouter);
   app.use('/api/experiment', experimentRouter);
+  app.use('/api/code-context', codeContextRouter);
 
   // JSON 404 for unknown API endpoints (never fall through to HTML)
   app.use('/api', (_req: Request, res: Response) => {

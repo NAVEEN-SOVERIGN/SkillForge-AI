@@ -11,6 +11,7 @@ import { CommandPalette } from './components/CommandPalette.js';
 
 // Lazy-loaded pages for code splitting — reduces initial bundle by ~60%
 const LandingPage = React.lazy(() => import('./pages/LandingPage.js').then(m => ({ default: m.LandingPage })));
+const CodeContextPage = React.lazy(() => import('./pages/CodeContextPage.js').then(m => ({ default: m.CodeContextPage })));
 const AuthPage = React.lazy(() => import('./pages/AuthPage.js').then(m => ({ default: m.AuthPage })));
 const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage.js').then(m => ({ default: m.OnboardingPage })));
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage.js').then(m => ({ default: m.DashboardPage })));
@@ -75,6 +76,7 @@ const AppRoutes: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/code-context" element={<CodeContextPage />} />
         <Route path="/auth" element={<AuthPage />} />
 
         {/* Protected Onboarding */}

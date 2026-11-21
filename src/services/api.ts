@@ -154,6 +154,29 @@ async function requestFile(endpoint: string): Promise<{ blob: Blob; filename: st
   return { blob, filename: match ? match[1] : null };
 }
 
+/**
+ * Calls the server-side GitHub proxy. A GitHub 401/403/429 is reported as a
+ * plain error message and never clears the SkillForge session.
+ */
+async function githubApiRequest<T>(endpoint: string): Promise<T> {
+  const token = getAuthToken();
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, { headers });
+  } catch (err) {
+    throw new Error(toUserMessage(err, 'Network error: could not reach the server.'));
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || `GitHub request failed (${response.status})`);
+  }
+  return data as T;
+}
+
 export const api = {
   // Auth
   auth: {
@@ -587,6 +610,34 @@ export const api = {
       request<{ experiment: ReadinessExperimentRecord }>(`/experiment/${id}/evidence`, { method: 'POST' }),
     complete: (id: string) =>
       request<{ experiment: ReadinessExperimentRecord }>(`/experiment/${id}/complete`, { method: 'POST' })
+  },
+
+  // Code Context — source-constrained decision synthesis
+  codeContext: {
+    github: (path: string) =>
+      githubApiRequest<{ data: unknown; link: string | null; remaining: number | null }>(`/code-context/github?path=${encodeURIComponent(path)}`),
+    graphStatus: () =>
+      request<{ configured: boolean }>('/code-context/graph/status'),
+    answer: (question: string, evidence: Array<{ id: string; kind: string; title: string; body: string; url: string; author?: string; date?: string; files?: string[]; relatedIds?: string[]; incident?: boolean }>) =>
+      request<{ answer: string; citationIds: string[]; citations: Array<{ id: string; kind: string; title: string; url: string; author?: string; date?: string }>; confidence: 'low' | 'medium' | 'high'; engine: string; graphConfigured: boolean }>('/code-context/answer', {
+        method: 'POST',
+        body: JSON.stringify({ question, evidence })
+      }),
+    adr: (evidence: Array<{ id: string; kind: string; title: string; body: string; url: string; author?: string; date?: string; relatedIds?: string[]; incident?: boolean }>) =>
+      request<{ markdown: string; mode: 'Gemini evidence rewrite' | 'Deterministic evidence template' }>('/code-context/adr', {
+        method: 'POST',
+        body: JSON.stringify({ evidence })
+      }),
+    syncGraph: (repo: string, evidence: Array<{ id: string; kind: string; title: string; body: string; url: string; author?: string; date?: string; files: string[]; symbols?: string[]; relatedIds?: string[]; incident?: boolean }>) =>
+      request<{ synced: number; repository: string }>('/code-context/graph/sync', {
+        method: 'POST',
+        body: JSON.stringify({ repo, evidence: evidence.slice(0, 400).map(item => ({ ...item, title: item.title.slice(0, 300), body: item.body.slice(0, 3000), url: item.url.slice(0, 2000), author: item.author?.slice(0, 100), date: item.date?.slice(0, 40), files: item.files.slice(0, 30).map(file => file.slice(0, 400)), symbols: item.symbols?.slice(0, 30).map(symbol => symbol.slice(0, 300)), relatedIds: item.relatedIds?.slice(0, 30).map(id => id.slice(0, 250)) })) })
+      }),
+    searchGraph: (repo: string, query: string) =>
+      request<{ evidence: Array<{ id: string; kind: string; title: string; body: string; url: string; date: string; author: string; files: string[]; symbols?: string[]; relatedIds?: string[]; incident?: boolean }>; traversed: boolean }>('/code-context/graph/search', {
+        method: 'POST',
+        body: JSON.stringify({ repo, query })
+      })
   },
 
   // SkillForge 2.0 — Live Skill Proof Lab

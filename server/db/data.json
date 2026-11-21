@@ -112,6 +112,16 @@
           "category": "DevOps & Deployment",
           "proficiency": 0,
           "status": "unverified"
+        },
+        {
+          "skillId": "dsa",
+          "name": "Data Structures & Algorithms",
+          "category": "Algorithms & Core CS",
+          "proficiency": 3,
+          "status": "assessed",
+          "assessmentScore": 100,
+          "lastAssessedAt": "2026-10-19T14:20:01.767Z",
+          "updatedAt": "2026-10-19T14:20:01.767Z"
         }
       ],
       "existingProjects": [
@@ -156,7 +166,7 @@
         "Distributed Computing",
         "FinTech Analytics"
       ],
-      "updatedAt": "2026-10-16T17:47:36.531Z"
+      "updatedAt": "2026-10-19T14:20:01.767Z"
     }
   },
   "roadmaps": {
@@ -1058,11 +1068,68 @@
           "attemptId": "att_1792174978909_nhv6df",
           "contentVersion": 1
         }
+      },
+      {
+        "id": "att_1792227115993_c1tjr8",
+        "userId": "demo_student_aarav",
+        "skillId": "python",
+        "skillName": "Python Programming",
+        "status": "in_progress",
+        "questionIds": [
+          "py_q1",
+          "py_q2",
+          "py_q3",
+          "py_q4",
+          "py_q5"
+        ],
+        "startedAt": "2026-10-17T08:51:55.992Z"
+      },
+      {
+        "id": "att_1792227125406_hre9t2",
+        "userId": "demo_student_aarav",
+        "skillId": "react",
+        "skillName": "React.js & Component Architecture",
+        "status": "in_progress",
+        "questionIds": [
+          "react_q1",
+          "react_q2",
+          "react_q3",
+          "react_q4",
+          "react_q5"
+        ],
+        "startedAt": "2026-10-17T08:52:05.406Z"
       }
     ]
   },
   "activities": {
     "demo_student_aarav": [
+      {
+        "id": "act_1792419601767_pos_retry",
+        "userId": "demo_student_aarav",
+        "activityType": "assessment",
+        "title": "Resubmitted Proof of Skill: LRU Cache Eviction Algorithm",
+        "details": "New score 100%. Evidence updated for an already-proven challenge; no duplicate credit awarded.",
+        "hoursSpent": 0,
+        "timestamp": "2026-10-19T14:20:01.767Z"
+      },
+      {
+        "id": "act_1792419240360_pos_retry",
+        "userId": "demo_student_aarav",
+        "activityType": "assessment",
+        "title": "Resubmitted Proof of Skill: LRU Cache Eviction Algorithm",
+        "details": "New score 100%. Evidence updated for an already-proven challenge; no duplicate credit awarded.",
+        "hoursSpent": 0,
+        "timestamp": "2026-10-19T14:14:00.360Z"
+      },
+      {
+        "id": "act_1792419011707_pos",
+        "userId": "demo_student_aarav",
+        "activityType": "assessment",
+        "title": "Passed Proof of Skill: LRU Cache Eviction Algorithm",
+        "details": "Verified by automated tests — Scored 100%.",
+        "hoursSpent": 0.4166666666666667,
+        "timestamp": "2026-10-19T14:10:11.707Z"
+      },
       {
         "id": "act_1792174983259_h53n",
         "userId": "demo_student_aarav",
@@ -1106,6 +1173,7 @@
       29
     ]
   },
+  "jobAnalyses": {},
   "aiMessages": {
     "demo_student_aarav": [
       {
@@ -1119,6 +1187,664 @@
           "Which project will best prove my missing skills?",
           "How should I structure my 14 hours this week?"
         ]
+      },
+      {
+        "id": "msg_u_1792218767855",
+        "role": "user",
+        "content": "What should I learn next and why?",
+        "timestamp": "2026-10-17T06:32:47.855Z",
+        "engineUsed": "Deterministic Advisory Engine"
+      },
+      {
+        "id": "msg_a_1792218767855",
+        "role": "assistant",
+        "content": "### Recommended Next Action for AI/ML Engineer\n\nBased on your current readiness score of **29%**, your highest-impact skill gap is **Deep Learning with PyTorch**.\n\n1. **Why it matters:** Required level is 4/5 (currently 1/5). High role importance (92%). All prerequisites satisfied—ready for immediate acceleration.\n2. **Immediate Focus:** Dedicate **8 hours** this week to Deep Learning with PyTorch.\n3. **Practice Milestone:** Work towards: *Advance to Train a multimodal embedding classifier to match product images with text queries..*.\n\nOnce you feel confident, take the **Deep Learning with PyTorch Assessment** in SkillForge to formally verify your competency and boost your readiness score.",
+        "timestamp": "2026-10-17T06:32:47.855Z",
+        "engineUsed": "Deterministic Advisory Engine",
+        "suggestedActions": [
+          "How do I practice Deep Learning with PyTorch?",
+          "Which project will best prove my missing skills?",
+          "How should I structure my 14 hours this week?"
+        ]
+      },
+      {
+        "id": "msg_u_1792218774050",
+        "role": "user",
+        "content": "How should I structure my 14 hours this week?",
+        "timestamp": "2026-10-17T06:32:54.050Z",
+        "engineUsed": "Deterministic Advisory Engine"
+      },
+      {
+        "id": "msg_a_1792218774050",
+        "role": "assistant",
+        "content": "### Weekly Study Plan (14 Hours Available)\n\nHere is a structured, high-retention weekly breakdown aligned with your **Project-based** preference:\n\n- **Phase 1: High-Priority Skill Gap (7 hrs/week):**\n  - Focus: **Deep Learning with PyTorch**\n  - Activity: Theory, documentation, and targeted coding exercises.\n- **Phase 2: Project Implementation (5 hrs/week):**\n  - Focus: Milestones for **Enterprise Document RAG & QA Pipeline**\n  - Activity: Write modular code, add error handling, and commit to GitHub.\n- **Phase 3: Assessment & Review (2 hrs/week):**\n  - Take skill quizzes and review incorrect answers to lock in retention.\n\n*Consistency beats cramming: sticking to this schedule will advance your career readiness by ~4-6% each week.*",
+        "timestamp": "2026-10-17T06:32:54.050Z",
+        "engineUsed": "Deterministic Advisory Engine",
+        "suggestedActions": [
+          "What should I learn next?",
+          "What is blocking my progress right now?",
+          "How do I prepare for technical interviews?"
+        ]
+      },
+      {
+        "id": "msg_u_1792226875178",
+        "role": "user",
+        "content": "What should I learn next?",
+        "timestamp": "2026-10-17T08:47:55.178Z",
+        "engineUsed": "Deterministic Advisory Engine"
+      },
+      {
+        "id": "msg_a_1792226875180",
+        "role": "assistant",
+        "content": "### Recommended Next Action for AI/ML Engineer\n\nBased on your current readiness score of **29%**, your highest-impact skill gap is **Deep Learning with PyTorch**.\n\n1. **Why it matters:** Required level is 4/5 (currently 1/5). High role importance (92%). All prerequisites satisfied—ready for immediate acceleration.\n2. **Immediate Focus:** Dedicate **8 hours** this week to Deep Learning with PyTorch.\n3. **Practice Milestone:** Work towards: *Advance to Train a multimodal embedding classifier to match product images with text queries..*.\n\nOnce you feel confident, take the **Deep Learning with PyTorch Assessment** in SkillForge to formally verify your competency and boost your readiness score.",
+        "timestamp": "2026-10-17T08:47:55.180Z",
+        "engineUsed": "Deterministic Advisory Engine",
+        "suggestedActions": [
+          "How do I practice Deep Learning with PyTorch?",
+          "Which project will best prove my missing skills?",
+          "How should I structure my 14 hours this week?"
+        ]
+      }
+    ]
+  },
+  "proofOfSkillEvidence": {
+    "demo_student_aarav": [
+      {
+        "id": "pos_ev_pos_algo_lru",
+        "userId": "demo_student_aarav",
+        "skillId": "dsa",
+        "skillName": "Data Structures & Algorithms",
+        "challengeId": "pos_algo_lru",
+        "challengeTitle": "LRU Cache Eviction Algorithm",
+        "score": 100,
+        "maxScore": 100,
+        "scorePercentage": 100,
+        "evaluationMethod": "automated_test_runner",
+        "evidenceStatus": "verified_automated_test",
+        "completedAt": "2026-10-19T14:20:01.766Z",
+        "passedTests": 3,
+        "totalTests": 3,
+        "classification": "test-verified",
+        "limitations": [
+          "Static invariant checks against curated criteria; not a full runtime test harness."
+        ]
+      }
+    ]
+  },
+  "interviewSessions": {},
+  "missionControlDecisions": {},
+  "missionControlActions": {
+    "demo_student_aarav": [
+      {
+        "id": "act_mc_pos_python",
+        "title": "Verify Python Programming Proficiency",
+        "description": "Complete the Python Programming practical challenge to earn verifiable proof of skill.",
+        "kind": "proof_of_skill",
+        "priority": "Critical",
+        "priorityScore": 95,
+        "state": "suggested",
+        "targetSkillId": "python",
+        "targetSkillName": "Python Programming",
+        "route": "/proof-of-skill",
+        "actionLabel": "Launch Practical Challenge",
+        "estimatedMinutes": 30,
+        "reasons": [
+          "High weight (95%) requirement for AI/ML Engineer",
+          "Currently unverified or self-reported in your profile"
+        ],
+        "completionCondition": "Pass Python Programming assessment with >= 75% score",
+        "updatedAt": "2026-10-18T11:51:46.149Z"
+      },
+      {
+        "id": "act_mc_forge_aiml",
+        "title": "Forge Gap-Closing Architecture Project",
+        "description": "Generate and start an industry-grade project designed specifically for AI/ML Engineer.",
+        "kind": "project_milestone",
+        "priority": "High",
+        "priorityScore": 85,
+        "state": "suggested",
+        "route": "/project-forge",
+        "actionLabel": "Open Project Forge",
+        "estimatedMinutes": 120,
+        "reasons": [
+          "Portfolio projects provide substantive evidence for hiring rubrics",
+          "Closes multi-skill dependencies simultaneously"
+        ],
+        "completionCondition": "Complete and verify Milestone 1 in Project Forge",
+        "updatedAt": "2026-10-18T11:51:46.150Z"
+      },
+      {
+        "id": "act_mc_arena_aiml",
+        "title": "Technical Interview Simulation",
+        "description": "Complete a targeted technical mock interview session for AI/ML Engineer.",
+        "kind": "interview_practice",
+        "priority": "Medium",
+        "priorityScore": 75,
+        "state": "suggested",
+        "route": "/interview-arena",
+        "actionLabel": "Enter Interview Arena",
+        "estimatedMinutes": 20,
+        "reasons": [
+          "Validates ability to defend architectural trade-offs verbally",
+          "Identifies theoretical blindspots before recruiter screening"
+        ],
+        "completionCondition": "Complete mock interview session and review scorecard",
+        "updatedAt": "2026-10-18T11:51:46.150Z"
+      },
+      {
+        "id": "act_mc_roadmap_aiml",
+        "title": "Weekly Learning Plan Progress",
+        "description": "Advance foundational curriculum milestones on your personalized roadmap.",
+        "kind": "roadmap_learning",
+        "priority": "Medium",
+        "priorityScore": 65,
+        "state": "suggested",
+        "route": "/roadmap",
+        "actionLabel": "View Learning Roadmap",
+        "estimatedMinutes": 60,
+        "reasons": [
+          "Steady progression ensures comprehensive coverage of prerequisites"
+        ],
+        "completionCondition": "Mark assigned weekly task as completed in roadmap",
+        "updatedAt": "2026-10-18T11:51:46.150Z"
+      }
+    ]
+  },
+  "forgedProjects": {},
+  "portfolioReviews": {},
+  "autopilotPlans": {
+    "demo_student_aarav": {
+      "userId": "demo_student_aarav",
+      "goal": "Become a AI/ML Engineer and secure a role aligned with Google.",
+      "targetRole": {
+        "id": "aiml",
+        "title": "AI/ML Engineer"
+      },
+      "objectives": [
+        {
+          "id": "obj_foundation",
+          "order": 1,
+          "title": "Establish prerequisite foundations",
+          "measurableOutcome": "Every prerequisite skill for the target role reaches proficiency 2/5 or higher.",
+          "prerequisiteIds": [],
+          "linkedSkillId": "deep_learning",
+          "status": "proposed"
+        },
+        {
+          "id": "obj_verify",
+          "order": 2,
+          "title": "Verify core skills with a targeted assessment",
+          "measurableOutcome": "At least one role-critical skill is passed in a graded assessment.",
+          "prerequisiteIds": [
+            "obj_foundation"
+          ],
+          "linkedSkillId": "pytorch",
+          "status": "proposed"
+        },
+        {
+          "id": "obj_practice",
+          "order": 3,
+          "title": "Prove the skill in a practical challenge",
+          "measurableOutcome": "A Proof of Skill challenge is passed with test-verified evidence.",
+          "prerequisiteIds": [
+            "obj_verify"
+          ],
+          "linkedSkillId": "pytorch",
+          "status": "proposed"
+        },
+        {
+          "id": "obj_build",
+          "order": 4,
+          "title": "Ship a portfolio project milestone",
+          "measurableOutcome": "At least one project milestone is completed with submitted evidence.",
+          "prerequisiteIds": [
+            "obj_verify"
+          ],
+          "status": "completed"
+        },
+        {
+          "id": "obj_interview",
+          "order": 5,
+          "title": "Defend your skills in a technical interview",
+          "measurableOutcome": "A technical interview session is completed and scored.",
+          "prerequisiteIds": [
+            "obj_practice",
+            "obj_build"
+          ],
+          "status": "proposed"
+        },
+        {
+          "id": "obj_reassess",
+          "order": 6,
+          "title": "Reassess career readiness",
+          "measurableOutcome": "Readiness for AI/ML Engineer is recalculated and any change is explained.",
+          "prerequisiteIds": [
+            "obj_interview"
+          ],
+          "status": "completed"
+        }
+      ],
+      "actions": [
+        {
+          "id": "ap_roadmap_deep_learning",
+          "objectiveId": "obj_foundation",
+          "title": "Strengthen prerequisite: Deep Learning with PyTorch",
+          "kind": "roadmap_learning",
+          "consequential": false,
+          "priority": "High",
+          "priorityScore": 85,
+          "reason": "Deep Learning with PyTorch is a prerequisite for a critical gap and is currently below proficiency 2.",
+          "prerequisites": [],
+          "expectedOutcome": "Raise Deep Learning with PyTorch foundations to at least level 2/5.",
+          "completionEvidence": [
+            "A completed roadmap learning task for this skill"
+          ],
+          "route": "/roadmap",
+          "actionLabel": "Open roadmap",
+          "requiresApproval": false,
+          "targetSkillId": "deep_learning",
+          "explanation": {
+            "what": "Focus a roadmap learning block on Deep Learning with PyTorch.",
+            "why": "Deep Learning with PyTorch depends on Deep Learning with PyTorch, which is currently below the foundational threshold.",
+            "supportingData": [
+              "Missing prerequisite: Deep Learning with PyTorch",
+              "Blocked gap: Deep Learning with PyTorch"
+            ],
+            "supportingReferences": [
+              {
+                "label": "Skill Gap Analysis",
+                "source": "Gap Engine",
+                "url": "/analysis"
+              }
+            ],
+            "assumptions": [
+              "Progress assumes consistent weekly study hours from your profile."
+            ],
+            "uncertainties": [
+              "The roadmap engine estimates hours; actual pace varies."
+            ],
+            "ifAccepted": "Adds a focused roadmap block; no application state is changed automatically.",
+            "reversible": true,
+            "evidenceClassification": "rule-checked"
+          },
+          "status": "proposed",
+          "recordedEvidence": [],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        },
+        {
+          "id": "ap_assess_pytorch",
+          "objectiveId": "obj_verify",
+          "title": "Verify Deep Learning with PyTorch with an assessment",
+          "kind": "assessment",
+          "consequential": false,
+          "priority": "Critical",
+          "priorityScore": 80,
+          "reason": "Assessment evidence is the fastest way to make your Deep Learning with PyTorch level independently verifiable.",
+          "prerequisites": [
+            "Foundational level in Deep Learning with PyTorch"
+          ],
+          "expectedOutcome": "Pass the Deep Learning with PyTorch assessment to convert a self-reported skill into verified evidence.",
+          "completionEvidence": [
+            "A passed assessment result for this skill"
+          ],
+          "route": "/assessments",
+          "actionLabel": "Take assessment",
+          "requiresApproval": false,
+          "targetSkillId": "pytorch",
+          "explanation": {
+            "what": "Take the Deep Learning with PyTorch skill assessment.",
+            "why": "It is a high-weight requirement for AI/ML Engineer and a high-priority gap in your profile.",
+            "supportingData": [
+              "Current level 1/5 vs required 4/5",
+              "Role importance 92%",
+              "Gap priority: Critical"
+            ],
+            "supportingReferences": [
+              {
+                "label": "Skill Gap Analysis",
+                "source": "Gap Engine",
+                "url": "/analysis"
+              },
+              {
+                "label": "Assessment Engine",
+                "source": "Assessments",
+                "url": "/assessments"
+              }
+            ],
+            "assumptions": [
+              "Passing reflects conceptual knowledge of the assessed topics."
+            ],
+            "uncertainties": [
+              "A single assessment samples a subset of topics."
+            ],
+            "ifAccepted": "Only records a result after you actually take and pass the assessment.",
+            "reversible": true,
+            "evidenceClassification": "rule-checked"
+          },
+          "status": "proposed",
+          "recordedEvidence": [],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        },
+        {
+          "id": "ap_proof_pytorch",
+          "objectiveId": "obj_practice",
+          "title": "Prove Deep Learning with PyTorch in a practical challenge",
+          "kind": "proof_of_skill",
+          "consequential": false,
+          "priority": "Critical",
+          "priorityScore": 75,
+          "reason": "Practical challenges produce the strongest stored evidence in the evidence graph — test-verified for curated challenges, explicitly labelled rule-checked or AI-reviewed rubrics otherwise.",
+          "prerequisites": [
+            "Foundational level in Deep Learning with PyTorch"
+          ],
+          "expectedOutcome": "Pass a Deep Learning with PyTorch Proof of Skill challenge.",
+          "completionEvidence": [
+            "A passed Proof of Skill evidence record"
+          ],
+          "route": "/proof-of-skill",
+          "actionLabel": "Open challenge",
+          "requiresApproval": false,
+          "targetSkillId": "pytorch",
+          "explanation": {
+            "what": "Complete the Deep Learning with PyTorch practical challenge.",
+            "why": "It converts a conceptual assessment pass into demonstrated, test-verified skill.",
+            "supportingData": [
+              "Target role: AI/ML Engineer",
+              "Skill gap: Deep Learning with PyTorch"
+            ],
+            "supportingReferences": [
+              {
+                "label": "Proof of Skill",
+                "source": "Proof of Skill Engine",
+                "url": "/proof-of-skill"
+              }
+            ],
+            "assumptions": [
+              "The deterministic evaluator checks structural invariants, not full correctness."
+            ],
+            "uncertainties": [
+              "Curated challenges are test-verified; gap challenges are graded by a labelled rule-checked or AI-reviewed rubric.",
+              "Static evaluation cannot prove runtime behaviour; results are labelled accordingly."
+            ],
+            "ifAccepted": "Records evidence only if you pass the challenge, classified by the method that actually graded it.",
+            "reversible": true,
+            "evidenceClassification": "rule-checked"
+          },
+          "status": "proposed",
+          "recordedEvidence": [],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        },
+        {
+          "id": "ap_project_aiml",
+          "objectiveId": "obj_build",
+          "title": "Complete a project milestone with evidence",
+          "kind": "project_milestone",
+          "consequential": true,
+          "priority": "High",
+          "priorityScore": 80,
+          "reason": "Portfolio milestones with submitted evidence are the strongest practical signal for hiring rubrics.",
+          "prerequisites": [],
+          "expectedOutcome": "A project milestone is completed and its evidence submitted.",
+          "completionEvidence": [
+            "A completed milestone with a repository or artifact link"
+          ],
+          "route": "/project-forge",
+          "actionLabel": "Open Project Forge",
+          "requiresApproval": true,
+          "explanation": {
+            "what": "Complete a project milestone and submit supporting evidence.",
+            "why": "Project evidence counts toward your practical project readiness component.",
+            "supportingData": [
+              "Project evidence can contribute up to 25 points of readiness."
+            ],
+            "supportingReferences": [
+              {
+                "label": "Project Forge",
+                "source": "Project Forge Engine",
+                "url": "/project-forge"
+              }
+            ],
+            "assumptions": [
+              "Submitted links are self-reported and not independently reviewed."
+            ],
+            "uncertainties": [
+              "Milestone effort estimates vary with your experience."
+            ],
+            "ifAccepted": "Marks the milestone complete and updates your portfolio evidence after you submit it.",
+            "reversible": true,
+            "evidenceClassification": "self-reported"
+          },
+          "status": "completed",
+          "recordedEvidence": [
+            "Completed at least one project milestone with evidence"
+          ],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        },
+        {
+          "id": "ap_interview_aiml",
+          "objectiveId": "obj_interview",
+          "title": "Complete a technical interview simulation",
+          "kind": "interview",
+          "consequential": false,
+          "priority": "Medium",
+          "priorityScore": 65,
+          "reason": "Interview performance reveals communication gaps that assessments cannot capture.",
+          "prerequisites": [
+            "At least one practical challenge or project milestone"
+          ],
+          "expectedOutcome": "A scored technical interview session is recorded.",
+          "completionEvidence": [
+            "A completed interview session scorecard"
+          ],
+          "route": "/interview-arena",
+          "actionLabel": "Enter Interview Arena",
+          "requiresApproval": false,
+          "explanation": {
+            "what": "Run a technical interview simulation.",
+            "why": "It validates your ability to defend skills verbally before a real screen.",
+            "supportingData": [
+              "Target role: AI/ML Engineer"
+            ],
+            "supportingReferences": [
+              {
+                "label": "Interview Arena",
+                "source": "Interview Arena Engine",
+                "url": "/interview-arena"
+              }
+            ],
+            "assumptions": [
+              "Answers are evaluated by an AI rubric and, when offline, a deterministic rubric."
+            ],
+            "uncertainties": [
+              "Rubric scores are indicative, not a real hiring decision."
+            ],
+            "ifAccepted": "Records a session scorecard; it does not change your skills automatically.",
+            "reversible": true,
+            "evidenceClassification": "ai-reviewed"
+          },
+          "status": "proposed",
+          "recordedEvidence": [],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        },
+        {
+          "id": "ap_recalc_aiml",
+          "objectiveId": "obj_reassess",
+          "title": "Reassess your career readiness",
+          "kind": "recalculate_readiness",
+          "consequential": false,
+          "priority": "Medium",
+          "priorityScore": 55,
+          "reason": "Recomputing readiness after new evidence keeps your plan aligned with reality.",
+          "prerequisites": [
+            "New assessment, proof, or project evidence"
+          ],
+          "expectedOutcome": "An updated readiness score with an explanation of what changed.",
+          "completionEvidence": [
+            "A readiness recalculation over the new evidence"
+          ],
+          "route": "/autopilot",
+          "actionLabel": "Reassess readiness",
+          "requiresApproval": false,
+          "explanation": {
+            "what": "Recalculate your career readiness score.",
+            "why": "Recent evidence may have changed your alignment with the target role.",
+            "supportingData": [
+              "Target role: AI/ML Engineer"
+            ],
+            "supportingReferences": [
+              {
+                "label": "Readiness Engine",
+                "source": "Readiness",
+                "url": "/report"
+              },
+              {
+                "label": "Data Structures & Algorithms — Scored 100% (3/3 checks passed)",
+                "source": "Proof of Skill",
+                "url": "/proof-of-skill"
+              },
+              {
+                "label": "Python Programming — Passed with 100%",
+                "source": "Assessment",
+                "url": "/assessments"
+              }
+            ],
+            "assumptions": [
+              "Uses the same deterministic readiness formula as every other page."
+            ],
+            "uncertainties": [
+              "Small deltas may reflect rounding, not real progress."
+            ],
+            "ifAccepted": "Displays the recomputed score; it changes no underlying records.",
+            "reversible": true,
+            "evidenceClassification": "rule-checked"
+          },
+          "status": "completed",
+          "recordedEvidence": [
+            "Recalculated readiness over new evidence"
+          ],
+          "approvedByUser": false,
+          "createdAt": "2026-10-19T12:52:19.319Z",
+          "updatedAt": "2026-10-19T14:19:42.009Z"
+        }
+      ],
+      "blockedActionIds": [],
+      "recommendedActionId": "ap_roadmap_deep_learning",
+      "recommendationReason": "Deep Learning with PyTorch is a prerequisite for a critical gap and is currently below proficiency 2. (priority High).",
+      "changeLog": [
+        {
+          "at": "2026-10-19T12:52:19.320Z",
+          "kind": "goal_set",
+          "summary": "Goal set: \"Become a AI/ML Engineer and secure a role aligned with Google.\". Decomposed into 6 objectives and 6 actions.",
+          "affectedActionIds": [
+            "ap_roadmap_deep_learning",
+            "ap_assess_pytorch",
+            "ap_proof_pytorch",
+            "ap_project_aiml",
+            "ap_interview_aiml",
+            "ap_recalc_aiml"
+          ]
+        }
+      ],
+      "generatedAt": "2026-10-19T12:52:19.320Z",
+      "lastReplannedAt": "2026-10-19T14:19:42.009Z",
+      "disclaimer": "Career Autopilot coordinates the existing SkillForge engines using only the data stored in your profile. It recommends and tracks actions; it never fabricates progress, and projections are planning aids, not guarantees of employment."
+    }
+  },
+  "decisionRecords": {},
+  "readinessExperiments": {
+    "demo_student_aarav": [
+      {
+        "id": "exp_1792414463009_bu2v33",
+        "userId": "demo_student_aarav",
+        "goal": "Raise readiness for AI/ML Engineer by proving my top skill gap.",
+        "targetRole": {
+          "id": "aiml",
+          "title": "AI/ML Engineer"
+        },
+        "status": "running",
+        "gapSkillId": "pytorch",
+        "gapSkillName": "Deep Learning with PyTorch",
+        "challengeId": "pos_gap_pytorch",
+        "initialReadiness": 29,
+        "initialBreakdown": {
+          "skillCoverageScore": 16.7,
+          "assessmentBonus": 2.5,
+          "projectEvidenceBonus": 10
+        },
+        "stages": [
+          {
+            "kind": "objective",
+            "title": "Define the objective",
+            "detail": "Raise readiness for AI/ML Engineer by proving my top skill gap.",
+            "status": "completed"
+          },
+          {
+            "kind": "snapshot",
+            "title": "Capture an initial readiness snapshot",
+            "detail": "Initial readiness: 29%.",
+            "status": "completed"
+          },
+          {
+            "kind": "gap_selection",
+            "title": "Select the highest-priority gap",
+            "detail": "Selected gap: Deep Learning with PyTorch (Critical priority, score 75).",
+            "status": "completed"
+          },
+          {
+            "kind": "challenge",
+            "title": "Prove the gap with a practical challenge",
+            "detail": "Submit a gap-driven challenge and record its evidence.",
+            "route": "/proof-of-skill",
+            "status": "active"
+          },
+          {
+            "kind": "project_milestone",
+            "title": "Complete a project milestone with evidence",
+            "detail": "Ship a milestone tied to the gap and submit its artifact link.",
+            "route": "/project-forge",
+            "status": "pending"
+          },
+          {
+            "kind": "evidence_collection",
+            "title": "Collect the new evidence",
+            "detail": "Gather every evidence record produced during the experiment.",
+            "status": "pending"
+          },
+          {
+            "kind": "interview",
+            "title": "Answer a targeted interview question",
+            "detail": "Validate the skill verbally against a role-specific prompt.",
+            "route": "/interview-arena",
+            "status": "pending"
+          },
+          {
+            "kind": "recalculation",
+            "title": "Recalculate readiness",
+            "detail": "Re-run the readiness engine over the new evidence.",
+            "status": "pending"
+          },
+          {
+            "kind": "report",
+            "title": "Report the outcome",
+            "detail": "Explain exactly which metrics changed and which evidence caused it.",
+            "status": "pending"
+          }
+        ],
+        "evidenceGained": [],
+        "metricChanges": [],
+        "reportSummary": "",
+        "startedAt": "2026-10-19T12:54:23.010Z",
+        "disclaimer": "Readiness is computed by the deterministic readiness engine over your real evidence. This experiment reports the observed change; it does not guarantee hiring outcomes."
       }
     ]
   }

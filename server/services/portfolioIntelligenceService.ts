@@ -1,6 +1,7 @@
 import { db } from '../db/store.js';
 import { CAREER_ROLES } from '../data/careers.js';
 import { callGeminiText, isGeminiConfigured } from './geminiClient.js';
+import { githubFetch } from './githubClient.js';
 import type {
   PortfolioIntelligenceData,
   PortfolioProjectCard,
@@ -62,13 +63,7 @@ export async function inspectPublicRepository(
   const { owner, repo } = parsed;
 
   try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'SkillForge-Career-Intelligence'
-      },
-      signal: AbortSignal.timeout(5000)
-    });
+    const res = await githubFetch(`/repos/${owner}/${repo}`, { signal: AbortSignal.timeout(5000) });
 
     if (res.ok) {
       const data = await res.json() as any;
@@ -104,7 +99,7 @@ export async function inspectPublicRepository(
       };
     }
   } catch (err) {
-    console.warn(`Public GitHub metadata fetch failed for ${repoUrl}:`, err);
+    console.warn(`Public GitHub metadata fetch failed for ${repoUrl}:`, err instanceof Error ? err.message : 'unknown error');
   }
 
   // Graceful fallback when rate limited or offline

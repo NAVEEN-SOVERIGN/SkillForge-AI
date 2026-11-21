@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SkillForge AI — Pitch Deck</title>
+<style>
+  :root {
+    --bg: #08080c;
+    --bg-2: #0e0e16;
+    --panel: rgba(255, 255, 255, 0.045);
+    --panel-2: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #d38a19;
+    --accent-soft: rgba(211, 138, 25, 0.16);
+    --text: #f3f1ec;
+    --muted: #9d988e;
+    --green: #4ade80;
+    --red: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(211, 138, 25, 0.18), transparent 60%),
+      radial-gradient(800px 500px at 100% 110%, rgba(120, 90, 255, 0.12), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .deck { position: relative; height: 100%; width: 100%; z-index: 1; }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6vh 8vw;
+    animation: fade 0.45s ease;
+  }
+  .slide.active { display: flex; }
+
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .kicker {
+    font-size: clamp(11px, 1.1vw, 14px);
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 1.4rem;
+  }
+
+  h1 {
+    font-size: clamp(40px, 7vw, 92px);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    font-weight: 750;
+  }
+  h1 .accent { color: var(--accent); }
+
+  h2 {
+    font-size: clamp(26px, 3.4vw, 46px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 2rem;
+  }
+  h2 .accent { color: var(--accent); }
+
+  .sub {
+    margin-top: 1.4rem;
+    font-size: clamp(15px, 1.6vw, 22px);
+    color: var(--muted);
+    max-width: 60ch;
+    line-height: 1.5;
+  }
+
+  .meta {
+    margin-top: 2.4rem;
+    font-size: clamp(12px, 1.1vw, 15px);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .meta span { color: var(--text); }
+
+  .grid { display: grid; gap: 1rem; }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.15rem 1.3rem;
+    backdrop-filter: blur(12px);
+  }
+  .card h3 {
+    font-size: clamp(14px, 1.25vw, 18px);
+    margin-bottom: 0.4rem;
+    font-weight: 650;
+  }
+  .card p, .card li {
+    font-size: clamp(12px, 1.02vw, 15px);
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .card .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 0.7rem;
+  }
+
+  ul.clean { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; }
+  ul.clean li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: clamp(14px, 1.4vw, 19px);
+    color: var(--text);
+    line-height: 1.45;
+  }
+  ul.clean li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.55em;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  ul.clean li strong { color: var(--text); }
+  ul.clean li span { color: var(--muted); }
+
+  .problem li::before { background: var(--red); }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+  }
+  .flow .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-size: clamp(12px, 1.05vw, 15px);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .flow .arrow { color: var(--accent); font-size: 18px; }
+
+  .flow-detail { margin-top: 2rem; }
+
+  .formula {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    font-size: clamp(13px, 1.35vw, 18px);
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .formula .c { color: var(--accent); }
+  .formula .m { color: var(--muted); }
+
+  .tiers { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 1.6rem; }
+  .tier {
+    display: grid;
+    grid-template-columns: 2.2fr 1.6fr 1fr;
+    align-items: center;
+    gap: 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: clamp(12px, 1.02vw, 15px);
+  }
+  .tier .name { color: var(--text); font-weight: 600; }
+  .tier .method { color: var(--muted); }
+  .tier .conf { color: var(--green); text-align: right; font-family: ui-monospace, monospace; }
+
+  .stats { display: flex; gap: 2.4rem; flex-wrap: wrap; margin-bottom: 2rem; }
+  .stat .v {
+    font-size: clamp(30px, 4vw, 56px);
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat .l {
+    margin-top: 0.45rem;
+    font-size: clamp(11px, 1vw, 14px);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .pill {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid rgba(211, 138, 25, 0.35);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font-size: clamp(11px, 0.95vw, 13px);
+    letter-spacing: 0.05em;
+    margin-top: 1.6rem;
+  }
+
+  .end-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2rem; align-items: end; }
+  .end-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; }
+  .end-list li { color: var(--muted); font-size: clamp(13px, 1.15vw, 16px); }
+  .end-list li strong { color: var(--text); display: block; margin-bottom: 0.15rem; }
+
+  .footer {
+    position: absolute;
+    left: 8vw; right: 8vw; bottom: 3.2vh;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .footer .brand { color: var(--accent); font-weight: 650; }
+
+  .progress {
+    position: fixed;
+    left: 0; bottom: 0;
+    height: 3px;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.35s ease;
+    z-index: 20;
+  }
+
+  .nav {
+    position: fixed;
+    right: 2.2vw; bottom: 3vh;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 20;
+  }
+  .nav button {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: rgba(18, 18, 26, 0.8);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    transition: 0.2s;
+    backdrop-filter: blur(8px);
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+  @media (max-width: 820px) {
+    .grid-2, .grid-3, .end-grid { grid-template-columns: 1fr; }
+    .slide { padding: 5vh 7vw; }
+    .flow { gap: 0.4rem; }
+    .stats { gap: 1.4rem; }
+    .tier { grid-template-columns: 1.6fr 1fr; }
+    .tier .method { display: none; }
+  }
+
+  @media print {
+    html, body { overflow: visible; background: #08080c; }
+    .slide { display: flex !important; position: relative; inset: auto; height: 100vh; page-break-after: always; }
+    .nav, .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide active">
+    <div class="kicker">Hackathon Pitch · 2026</div>
+    <h1>SkillForge <span class="accent">AI</span></h1>
+    <p class="sub">Turn career goals into measurable skills, verifiable proof, and actionable job readiness.</p>
+    <p class="meta"><span>[Hackathon Name]</span> · <span>[Team Name]</span> · <span>[Live URL]</span></p>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>01 / 10</span></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <div class="kicker">The Problem</div>
+    <h2>Students learn randomly —<br />and can’t <span class="accent">prove</span> it.</h2>
+    <ul class="clean problem">
+      <li><strong>Skill opacity</strong> <span>— don’t know what roles actually require</span></li>
+      <li><strong>Learning scatter</strong> <span>— no structured, dependency-aware path</span></li>
+      <li><strong>Evidence gap</strong> <span>— certificates don’t prove real capability</span></li>
+    </ul>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>02 / 10</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <div class="kicker">The Solution</div>
+    <h2>An <span class="accent">explainable</span> career<br />readiness platform.</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>Diagnose</h3><p>Analyze role requirements and live job descriptions to find real gaps.</p></div>
+      <div class="card"><h3>Govern</h3><p>Propose approval-gated career actions — never autonomous.</p></div>
+      <div class="card"><h3>Prove</h3><p>Verify skills through server-graded coding challenges.</p></div>
+      <div class="card"><h3>Trace</h3><p>Record tamper-resistant evidence and score readiness 0–100%.</p></div>
+    </div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>03 / 10</span></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <div class="kicker">Core Features</div>
+    <h2>Everything in one loop.</h2>
+    <div class="grid grid-3">
+      <div class="card"><div class="num">01</div><h3>Opportunity Match</h3><p>JD → 4-quadrant gap analysis.</p></div>
+      <div class="card"><div class="num">02</div><h3>Career Autopilot</h3><p>Human-approved actions + audit trail.</p></div>
+      <div class="card"><div class="num">03</div><h3>Skill Proof Lab</h3><p>Server-verified coding challenges.</p></div>
+      <div class="card"><div class="num">04</div><h3>Evidence Graph</h3><p>Requirement → Skill → Proof → Readiness.</p></div>
+      <div class="card"><div class="num">05</div><h3>Career Twin</h3><p>What-if trajectory simulation.</p></div>
+      <div class="card"><div class="num">06</div><h3>Readiness Score</h3><p>Transparent, formula-driven, no black box.</p></div>
+    </div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>04 / 10</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <div class="kicker">How It Works</div>
+    <h2>Analyze → Govern → Prove → Trace → Simulate</h2>
+    <div class="flow">
+      <span class="step">Paste JD</span><span class="arrow">→</span>
+      <span class="step">Detect gap</span><span class="arrow">→</span>
+      <span class="step">Approve action</span><span class="arrow">→</span>
+      <span class="step">Pass proof</span><span class="arrow">→</span>
+      <span class="step">Update graph</span><span class="arrow">→</span>
+      <span class="step">Simulate future</span>
+    </div>
+    <ul class="clean flow-detail">
+      <li>Every gap becomes an actionable, approved career step.</li>
+      <li>Every approved step produces verified evidence.</li>
+      <li>Every evidence record updates the readiness score.</li>
+    </ul>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>05 / 10</span></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <div class="kicker">Under the Hood</div>
+    <h2>Built to be <span class="accent">explainable</span> and reliable.</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>Stack</h3><p>React 19 · TypeScript · Vite · Node.js · Express 5</p></div>
+      <div class="card"><h3>Auth</h3><p>JWT sessions + strict tenant isolation.</p></div>
+      <div class="card"><h3>AI</h3><p>Google Gemini + deterministic offline fallback.</p></div>
+      <div class="card"><h3>Storage</h3><p>Transactional JSON store with atomic writes.</p></div>
+      <div class="card"><h3>Engines</h3><p>Gap · Readiness · Autopilot · Proof · Graph · What-If</p></div>
+      <div class="card"><h3>Delivery</h3><p>Server-rendered PDF reports · zero external DB.</p></div>
+    </div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>06 / 10</span></div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <div class="kicker">Readiness Formula</div>
+    <h2>No black boxes. Just <span class="accent">math</span>.</h2>
+    <div class="formula"><span class="c">R</span> = <span class="c">50%</span> skill coverage
+  + <span class="c">25%</span> assessments
+  + <span class="c">25%</span> projects
+
+<span class="m">// every score traceable to recorded evidence</span></div>
+    <div class="tiers">
+      <div class="tier"><span class="name">Direct proof</span><span class="method">Challenge passed</span><span class="conf">0.95</span></div>
+      <div class="tier"><span class="name">Assessment</span><span class="method">Server-graded MCQ</span><span class="conf">0.85</span></div>
+      <div class="tier"><span class="name">Project</span><span class="method">Verified milestone</span><span class="conf">0.80</span></div>
+      <div class="tier"><span class="name">Self-reported</span><span class="method">Onboarding claim</span><span class="conf">0.40</span></div>
+    </div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>07 / 10</span></div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <div class="kicker">Proof It Works</div>
+    <h2>A working prototype,<br />not a mockup.</h2>
+    <div class="stats">
+      <div class="stat"><div class="v">365</div><div class="l">Tests passing</div></div>
+      <div class="stat"><div class="v">32</div><div class="l">Test suites</div></div>
+      <div class="stat"><div class="v">30+</div><div class="l">Live pages</div></div>
+      <div class="stat"><div class="v">100%</div><div class="l">Pass rate</div></div>
+    </div>
+    <ul class="clean">
+      <li>Live deployed, fully functional, demo-ready.</li>
+      <li>Works offline — deterministic AI fallback.</li>
+      <li>9 failure scenarios tested end to end.</li>
+    </ul>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>08 / 10</span></div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <div class="kicker">Why It Stands Out</div>
+    <h2>Proof over <span class="accent">promises</span>.</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>Explainable</h3><p>Every recommendation has a causal trace.</p></div>
+      <div class="card"><h3>Human-governed</h3><p>No career action executes without consent.</p></div>
+      <div class="card"><h3>Evidence-backed</h3><p>Verified execution, not self-claims.</p></div>
+      <div class="card"><h3>Reliable</h3><p>Offline-capable with zero-crash fallback.</p></div>
+    </div>
+    <div class="pill">Not a course reseller — diagnose, prescribe, verify.</div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>09 / 10</span></div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <div class="kicker">Roadmap &amp; Close</div>
+    <h2>From prototype to <span class="accent">platform</span>.</h2>
+    <div class="end-grid">
+      <div>
+        <ul class="clean">
+          <li><strong>Next:</strong> <span>Postgres scaling + sandboxed code execution</span></li>
+          <li><strong>Next:</strong> <span>Recruiter-facing verified evidence profiles</span></li>
+          <li><strong>Next:</strong> <span>Expanded career catalog &amp; institution dashboards</span></li>
+        </ul>
+        <div class="pill">Try it: [Live URL] → Explore Demo</div>
+      </div>
+      <div>
+        <ul class="end-list">
+          <li><strong>[Team Name]</strong>[Team members]</li>
+          <li><strong>Contact</strong>[email / GitHub / QR]</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer"><span class="brand">SkillForge AI</span><span>10 / 10</span></div>
+  </section>
+
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="nav">
+  <button id="prev" aria-label="Previous slide">‹</button>
+  <button id="next" aria-label="Next slide">›</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const progress = document.getElementById('progress');
+  let index = 0;
+
+  function show(i) {
+    index = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, n) => s.classList.toggle('active', n === index));
+    progress.style.width = ((index + 1) / slides.length) * 100 + '%';
+    history.replaceState(null, '', '#' + (index + 1));
+  }
+
+  function next() { show(index + 1); }
+  function prev() { show(index - 1); }
+
+  document.getElementById('next').addEventListener('click', next);
+  document.getElementById('prev').addEventListener('click', prev);
+
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); next(); }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+
+  let startX = null;
+  document.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
+    startX = null;
+  }, { passive: true });
+
+  const initial = parseInt(location.hash.replace('#', ''), 10);
+  show(Number.isFinite(initial) && initial > 0 ? initial - 1 : 0);
+</script>
+</body>
+</html>

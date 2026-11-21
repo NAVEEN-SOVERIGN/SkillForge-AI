@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.js';
 import { useToast } from '../context/ToastContext.js';
-import { Layers, Sparkles, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
+import { Sparkles, LogIn, UserPlus, ShieldCheck } from 'lucide-react';
+import { BrandMark } from '../components/BrandMark.js';
 
 export const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -110,14 +111,14 @@ export const AuthPage: React.FC = () => {
                 width: 36,
                 height: 36,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #D38A19 0%, #B27010 100%)',
+                background: 'linear-gradient(135deg, #174e4d 0%, #126b68 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 10px rgba(211, 138, 25, 0.35)'
+                boxShadow: '0 2px 10px rgba(20, 87, 91, 0.3)'
               }}
             >
-              <Layers size={20} color="#ffffff" />
+              <BrandMark size={27} />
             </div>
             <span>SkillForge <span style={{ color: 'var(--color-accent)' }}>AI</span></span>
           </Link>
