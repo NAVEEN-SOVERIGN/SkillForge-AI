@@ -9,9 +9,10 @@ import {
 import { api, errorText, pending } from './api'
 import type { Repository, Scan, Session, Snapshot } from './api'
 import { CodeGraph } from './Graph'
+import { Practice } from './Practice'
 import './styles.css'
 
-type View = 'workspace' | 'rankings'
+type View = 'workspace' | 'rankings' | 'practice'
 type Tab = 'graph' | 'quality' | 'history'
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
   const [settings, setSettings] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [previous, setPrevious] = useState<Scan | undefined>()
+  const [practiceFocus, setPracticeFocus] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -144,6 +146,7 @@ function App() {
         <nav aria-label="Main navigation">
           <button className={view === 'workspace' ? 'nav-active' : ''} onClick={() => setView('workspace')}><Graph size={18} /> Workspace</button>
           <button className={view === 'rankings' ? 'nav-active' : ''} onClick={() => setView('rankings')}><ChartBar size={18} /> Rankings</button>
+          <button className={view === 'practice' ? 'nav-active' : ''} onClick={() => { setPracticeFocus(null); setView('practice') }}><Code size={18} /> Practice</button>
         </nav>
         <button className="top-account" onClick={() => setSettings(!settings)} aria-expanded={settings}>
           <GithubLogo size={18} /><span>{session?.login ?? 'Account'}</span>
@@ -221,12 +224,14 @@ function App() {
                 <button className={tab === 'history' ? 'current' : ''} onClick={() => setTab('history')}><GitBranch size={17} /> Decision history</button>
               </div>
               {tab === 'graph' && <CodeGraph key={snapshot.repo + snapshot.revision} snapshot={snapshot} scanId={active} />}
-              {tab === 'quality' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious} />}
+              {tab === 'quality' && <Scorecard snapshot={snapshot} comparable={comparable} previous={previous} onCompare={setPrevious}
+                onPractice={id => { setPracticeFocus(id); setView('practice'); window.scrollTo(0, 0) }} />}
               {tab === 'history' && <History snapshot={snapshot} />}
             </>}
           </section>
         </div>
-      </> : <Rankings scans={scans} onOpen={id => openScan(id, 'quality')} onWorkspace={() => setView('workspace')} />}
+      </> : view === 'rankings' ? <Rankings scans={scans} onOpen={id => openScan(id, 'quality')} onWorkspace={() => setView('workspace')} />
+        : <Practice enabled={!!session?.judge} initialProblem={practiceFocus} />}
     </main>
     <footer><span>SkillForge</span><span>Repository analysis and applied practice</span></footer>
     {picker && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Choose a GitHub repository">
@@ -255,8 +260,8 @@ function History({ snapshot }: { snapshot: Snapshot }) {
   </section>
 }
 
-function Scorecard({ snapshot, previous, comparable, onCompare }: {
-  snapshot: Snapshot; previous?: Scan; comparable: Scan[]; onCompare: (scan?: Scan) => void
+function Scorecard({ snapshot, previous, comparable, onCompare, onPractice }: {
+  snapshot: Snapshot; previous?: Scan; comparable: Scan[]; onCompare: (scan?: Scan) => void; onPractice: (id: string) => void
 }) {
   const quality = snapshot.quality
   const delta = previous?.summary?.score != null && quality.score != null ? quality.score - previous.summary.score : null
@@ -281,7 +286,11 @@ function Scorecard({ snapshot, previous, comparable, onCompare }: {
         <article key={finding.title}><div className="finding-icon">{finding.state === 'met' ? <CheckCircle size={22} /> : <Code size={22} />}</div>
           <div><h4>{finding.title}</h4><p>{finding.detail}</p>{finding.path && <small className="mono">{finding.url && !snapshot.sample
             ? <a href={finding.url} target="_blank" rel="noreferrer">{finding.path}:{finding.line} <ArrowUpRight size={13} /></a>
-            : finding.path + ':' + finding.line}</small>}</div>
+            : finding.path + ':' + finding.line}</small>}
+            {finding.state === 'review' && finding.dimension === 'Performance hygiene' && <button className="text-button"
+              onClick={() => onPractice('load-monitor')}>Practice efficient processing</button>}
+            {finding.state === 'review' && finding.title === 'Test files are present' && <button className="text-button"
+              onClick={() => onPractice('support-coverage')}>Practice boundary cases</button>}</div>
           <span className={'finding-pts ' + finding.state}>{finding.points}/{finding.max}</span></article>)}
     </section>
     {snapshot.review && <section className="panel findings">

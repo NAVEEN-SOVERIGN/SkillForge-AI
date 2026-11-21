@@ -19,6 +19,7 @@ from sqlalchemy import delete, insert, select, update
 from . import config
 from .db import attempts, digest, engine, metadata, now, profiles, provision, scans, session, sessions, touch
 from .github import GitHubError, api, client, public_repositories, read_source, repo_name
+from .practice import router as practice_router
 from .review import enabled as ai_enabled
 from .sample import SNAPSHOT, SOURCES
 from .scanning import compile_snapshot, run_scans, source_for
@@ -281,6 +282,9 @@ def sample_source(path: str):
     if path not in SOURCES:
         raise HTTPException(404, "This file is outside the sample.")
     return {"path": path, "source": SOURCES[path], "url": None}
+
+
+app.include_router(practice_router)
 
 
 if (DIST / "assets").is_dir():

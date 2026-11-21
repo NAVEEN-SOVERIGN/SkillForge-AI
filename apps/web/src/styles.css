@@ -182,3 +182,19 @@ footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content: space-betwe
 @media (prefers-reduced-motion: no-preference) {
   button, a { transition: background-color .13s, color .13s; }
 }
+.practice-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; }
+.practice-library h2 { margin-bottom: 8px; }
+.practice-detail { display: grid; gap: 12px; min-width: 0; }
+.challenge h2 { font-size: clamp(23px,3vw,33px); letter-spacing: -.045em; }
+.challenge h3:not(:first-child), .challenge h4 { margin-top: 12px; }
+.challenge p { color: var(--muted); margin-top: 7px; }
+.challenge .subtle { font-size: 13px; }
+.example-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.example-grid pre { overflow: auto; padding: 10px; background: #edf1e8; border: 1px solid var(--rule); border-radius: 4px; max-height: 190px; }
+.solution { display: block; width: 100%; min-height: 260px; margin: 12px 0; resize: vertical; border: 1px solid #334f40; padding: 13px; border-radius: 5px; color: #ebf3e9; background: #202d27; font: 13px/1.65 ui-monospace, Consolas, monospace; tab-size: 4; }
+.case-row { border-top: 1px solid var(--rule); padding: 8px 0; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 5px; }
+.case-row svg { color: var(--green); }
+@media (max-width: 680px) {
+  .practice-grid { grid-template-columns: minmax(0,1fr); gap: 13px; }
+  .practice .panel { padding: 12px; }
+}
