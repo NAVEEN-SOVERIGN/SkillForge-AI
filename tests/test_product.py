@@ -141,6 +141,19 @@ def account():
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_production_headers_apply_to_success_and_rejected_requests(self):
+        with TestClient(app) as client, patch.object(config, "PRODUCTION", True):
+            health = client.get("/api/health")
+            self.assertEqual(health.status_code, 200)
+            rejected = client.post("/api/scans", json={"repository": "owner/repo"})
+            self.assertEqual(rejected.status_code, 403)
+            for response in (health, rejected):
+                self.assertEqual(response.headers["strict-transport-security"], "max-age=31536000")
+                self.assertEqual(response.headers["x-content-type-options"], "nosniff")
+                self.assertEqual(response.headers["cross-origin-resource-policy"], "same-origin")
+                self.assertEqual(response.headers["cache-control"], "no-store")
+                self.assertIn("default-src 'none'", response.headers["content-security-policy"])
+
     def test_scan_publishes_a_score_only_after_rubric_approval(self):
         with TestClient(app) as owner, TestClient(app) as other:
             owner.get("/api/session").raise_for_status()
