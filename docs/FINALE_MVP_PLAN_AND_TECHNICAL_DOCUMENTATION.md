@@ -14,7 +14,7 @@ SkillForge is a React 19 + TypeScript + Vite web application served with an Expr
 
 ### Where we will be by 12:00 PM, 22 November
 
-Deliver a live, evaluator-usable Code Context MVP with a focused **native app shell** around the existing React product; public-repository question answering with linked evidence; the existing guardrail, textual Déjà Vu detector, graph/time exploration and ADR export; and **Sarvam speech-to-text in the question flow**. A user taps the microphone, speaks a question, reviews/edits the transcript, then submits that text through the same evidence retrieval flow. Typed input remains available when permission, network or provider calls fail. This is a planned integration, not a current capability.
+Deliver a live, evaluator-usable Code Context MVP with a focused **native app shell** around the existing React product; public-repository question answering with linked evidence; the existing guardrail, textual Déjà Vu detector, **Neo4j AuraDB-backed relationship graph**, graph/time exploration and ADR export; and **Sarvam speech-to-text in the question flow**. Configure AuraDB for the live demo, sync the retrieved repository evidence, and use graph relationships during evidence retrieval so users can trace files to decisions, PRs, issues and contributors. A user taps the microphone, speaks a question, reviews/edits the transcript, then submits that text through the same evidence retrieval flow. Typed input remains available when permission, network or provider calls fail. Neo4j and Sarvam are planned finale integrations, not claims of currently configured production services.
 
 Complete primary and one additional segment journey; validate demand through three real target-segment conversations; record source-backed market-fit evidence; run and save the ArgosX baseline by midnight, fix critical/high findings, run and save the final scan by 11:00 AM; publish the working build and submit both reports plus a remediation log by noon. Report market, pricing, interview, deployment and scan claims only after collecting evidence.
 
@@ -25,19 +25,22 @@ Complete primary and one additional segment journey; validate demand through thr
 | **Primary: developers joining or maintaining an unfamiliar public codebase** | They can inspect behavior but struggle to find the historical reason and supporting evidence. | Ask why a behavior/configuration exists; check a proposed diff for linked history or possible textual repeats. | Working end to end in the live build. |
 | **Additional: engineering/on-call leads** | They need historical context before changing incident-sensitive code. | Review files linked to an issue/incident; export a cited ADR for a proposed change. | At least the guardrail + cited export journey working. |
 | **Additional: open-source contributors and reviewers** | They need project conventions and context before proposing a change. | Ask a repository question by voice or text; inspect the linked PR/issue trail and time order. | Voice transcript enters the same question flow; source review works. |
+| **Additional: student developers** | They are learning unfamiliar repositories and need to understand how real projects evolved. | Ask why a feature or configuration exists; trace a code change to its PR, issue and contributor before using it in a class or team project. | Complete a guided sample-repository walkthrough with evidence links and beginner-friendly explanations. |
 
 **First user and payer:** not yet validated. Problem evidence, current alternatives, switching reasons, pricing, market sizing, competitor comparison and acquisition evidence have not yet been established in this repository. Do not present a paying customer or validated demand as fact before collecting evidence. Record interview/source dates and distinguish earlier research from finale interviews.
 
-### Partner technology and product need
+### Partner technologies and product need
 
 **Sarvam AI speech-to-text** is planned to let a developer ask repository questions by voice, including Indian-language or code-switched speech where the selected Sarvam model supports it. It addresses the friction of typing a precise question while exploring a codebase and provides a more accessible question-entry path. The microphone is part of the core query journey, not a standalone API demo. The transcript is shown for correction before submission. The exact model, supported languages, API contract and latency are not yet confirmed against current provider documentation and credentials.
+
+**Neo4j AuraDB** is already supported by the prototype's graph sync/search routes and will be configured as the live finale graph store. The core flow will sync retrieved repository records into a graph connecting files and code entities with PRs, issues, decisions and contributors, then use those relationships to retrieve and display cited context for a question. The UI and answer must still show source links and abstain when the graph/history has no support. If AuraDB is unavailable, report that graph retrieval is unavailable and use only the existing evidence-backed fallback; do not imply the graph was queried. Neo4j credentials remain server-side.
 
 ### General 22-hour delivery plan
 
 | Phase | Focus and exit evidence |
 |---|---|
 | **Baseline and scope** | Audit the prototype, confirm reuse rights and platform/device feasibility, capture current build/test behavior, and lock the primary user journey and API boundaries. Submit the plan by **4 PM, 21 Nov**. |
-| **Core build and partner integration** | Package the existing React experience in the selected native shell if toolchain checks pass; integrate Sarvam STT into the question flow with editable transcript and typed fallback; complete the primary and one additional persona journey. Keep provider credentials server-side. |
+| **Core build and partner integration** | Package the existing React experience in the selected native shell if toolchain checks pass; configure Neo4j AuraDB and demonstrate graph sync plus relationship-backed evidence retrieval; integrate Sarvam STT into the question flow with editable transcript and typed fallback; complete the primary and one additional persona journey. Keep provider credentials server-side. |
 | **Security baseline and remediation** | Run ArgosX against the app/API by **midnight, 21 Nov**; download the report, triage findings, fix critical/high issues first, retest, and document residual risks. Include auth, input limits, secret handling, API host/redirect restrictions and provider failure cases. |
 | **Validation and hardening** | Run three target-user conversations; record assumptions, observed evidence and resulting product changes. Exercise typed/voice journeys, evidence citations, guardrail, Déjà Vu, graph/time view, ADR export, native permissions, network failures and mobile/accessibility states. Run typecheck, automated tests and production build. |
 | **Release and submission** | Deploy and smoke-test the candidate; complete the final ArgosX scan and download its report by **11 AM, 22 Nov**. Finish the remediation log, confirm the evaluator can use the product, and submit the live build and required reports by **12 PM, 22 Nov**. |
@@ -53,7 +56,7 @@ The following describes code found in this checkout; it does not certify that ex
 | Client | React 19, TypeScript, Vite, React Router; Code Context and career pages. | No native wrapper/framework dependency found; current product is a web app. | `package.json`, `src/App.tsx`, `src/pages/CodeContextPage.tsx` |
 | API | Express 5 routes include auth, career modules and `/api/code-context`; health route exists. | No deployment health result asserted by source code alone. | `server/app.ts`, `server/routes/codeContext.ts` |
 | GitHub retrieval | Server-side GitHub client supports bearer token, request timeout, in-flight request coalescing and user-readable errors. Client retrieves bounded public history and patches. | Not a complete repository index; no private-repository OAuth flow evidenced. | `server/services/githubClient.ts`, `server/routes/codeContext.ts`, `src/pages/CodeContextPage.tsx` |
-| Decision graph | Neo4j Aura Query API sync/search can build relationships when URL and credentials are configured. | Optional and configuration-dependent; no proof current deployment has AuraDB configured. | `server/routes/codeContext.ts`, `.env.example` |
+| Decision graph | Neo4j Aura Query API sync/search can build relationships when URL and credentials are configured. | Integration is configuration-dependent; no proof current deployment has AuraDB configured. Configure it and verify sync/search during the finale. | `server/routes/codeContext.ts`, `.env.example` |
 | Database | Transactional JSON file store with demo seed data. | Not PostgreSQL/MongoDB; Render free filesystem is documented as ephemeral. Multi-instance durability/concurrency needs a managed database. | `server/db/store.ts`, `server/db/data.json`, `render.yaml` |
 | Authentication | Registration hashes passwords with bcrypt; login returns JWT; auth middleware verifies JWT and supports a fixed demo token. | Demo endpoint/token is intentionally evaluator-oriented; harden before production and keep demo capabilities separated. | `server/routes/auth.ts`, `server/middleware/auth.ts`, `src/context/AuthContext.tsx` |
 | AI | Gemini server client records outcomes and falls back when unavailable; Code Context answer/ADR routes use provided evidence and deterministic templates. | Gemini availability is not guaranteed; Code Context ranking is lexical and history is sampled. | `server/services/geminiClient.ts`, `server/services/aiProviderStatus.ts`, `server/routes/codeContext.ts` |
@@ -95,7 +98,7 @@ flowchart LR
   G --> F[Evidence-only fallback / abstain]
   A --> E[Answer + source IDs]
   F --> E
-  G --> Neo[(Neo4j AuraDB, optional graph persistence)]
+  G <--> Neo[(Neo4j AuraDB graph: sync + relationship retrieval)]
   API --> DB[(Current JSON store; planned managed DB decision)]
   Argos[ArgosX scans] -. security findings .-> API
   Argos -. security findings .-> W
@@ -127,7 +130,7 @@ The opening baseline should include measured import request count, elapsed time,
 | UI | Existing React 19 + TypeScript + Vite; planned Capacitor wrapper | Reuse the working browser workflow; package it for device launch and microphone permissions without duplicating app logic. |
 | API | Existing Node.js + Express 5 + TypeScript | Keeps third-party credentials server-side, validates requests and offers a single API to web/native clients. |
 | Repository source | GitHub REST API through server proxy | Source of PR, issue, commit and patch evidence. Only cite retrieved records; handle API limits and missing patches. |
-| Decision graph | Existing optional Neo4j AuraDB Query API | Stores links between repository evidence, people, code paths, decisions and incidents; not required for typed/voice query fallback. |
+| Decision graph | Existing Neo4j AuraDB Query API, configured for the finale flow | Stores links between repository evidence, people, code paths, decisions and incidents; question retrieval uses graph relationships when AuraDB is available, with explicit status and evidence-only fallback if it is not. |
 | User data | Existing JSON file for prototype; choose managed database for durable multi-user product after validation | JSON is simple for prototype but unsuitable for concurrent/multi-instance production persistence. Finale scope is migration decision/adapter only if time permits. |
 | Speech | Planned Sarvam AI STT through server-side adapter | Enables voice-first repository questions; transcript must be reviewable and feed the same core query API. Confirm supported language/model and request format against provider docs. |
 | Answer synthesis | Existing optional Gemini + deterministic evidence fallback | AI can phrase retrieved facts; source IDs and abstention remain mandatory. Voice transcription is separate from rationale generation. |
@@ -142,7 +145,7 @@ The opening baseline should include measured import request count, elapsed time,
 2. App loads a bounded sample of commits, PRs, issues, discussion and design records; UI displays what was loaded and source links.
 3. User taps **Ask by voice**, grants microphone permission, speaks a question, and reviews/edits the transcript. Typing remains available.
 4. Transcript/question is sent to the same repository evidence query path as typed text.
-5. Answer shows citations, dates/authors, confidence and related graph records. Missing rationale is explicitly reported; no unsupported answer is presented.
+5. The API uses Neo4j relationships among retrieved repository records to find relevant context; the answer shows citations, dates/authors, confidence and related graph records. Missing rationale is explicitly reported; no unsupported answer is presented. If graph storage is unavailable, the UI identifies that state and the response uses only available cited evidence.
 6. User explores the Time Machine/relationship graph, checks a change with the guardrail/Déjà Vu detector, and exports an ADR from cited records.
 
 ### Additional journey: reviewer / on-call lead
@@ -207,7 +210,7 @@ Proposed endpoint: `POST /api/code-context/transcribe` (multipart or provider-su
 | VoiceRequest (ephemeral) | request ID, status and sanitized timing/provider outcome; do not persist raw audio by default. |
 | SecurityFinding | ArgosX scan date, severity, location, remediation, status, residual-risk rationale and report reference. |
 
-Current DB persistence is JSON and Code Context graph persistence is optional Neo4j. During finale, do not claim the JSON store is a production-grade database. The production migration target has not been selected; avoid risky schema migration during the short MVP unless necessary for the demo. Longer term, relational storage should own identity, consent, authorization and job state; Neo4j should be a scoped projection keyed by user/repository/snapshot. Provision a replacement graph snapshot and verify it before retiring the previous usable snapshot. Apply access revocation/deletion in the authoritative store first, then retry graph/cache cleanup until reconciled.
+Current DB persistence is JSON and Code Context graph persistence is supported through Neo4j AuraDB when configured. Configure AuraDB for the finale demo and verify graph sync/search against the sample repository; do not claim the JSON store is a production-grade database. The production migration target has not been selected; avoid risky schema migration during the short MVP unless necessary for the demo. Longer term, relational storage should own identity, consent, authorization and job state; Neo4j should be a scoped projection keyed by user/repository/snapshot. Provision a replacement graph snapshot and verify it before retiring the previous usable snapshot. Apply access revocation/deletion in the authoritative store first, then retry graph/cache cleanup until reconciled.
 
 ## 7. Authentication, Security and Reliability
 
@@ -269,6 +272,7 @@ Scale from a sampled public-repository demo to a multi-user product only after t
 | Developer joining/maintaining an unfamiliar repo (primary) | Intent is scattered across source history. | Ask why a behavior exists by text/voice. | Check proposed diff against earlier decisions and export an ADR. | Code Context, Sarvam transcript entry, evidence graph, guardrail and ADR. | Existing web workflow; native + voice planned; end-to-end acceptance by noon. |
 | Engineering/on-call lead | Change review needs historical incident context. | Identify files connected to retrieved issues/incidents. | Review cited history before a risky edit and share a PR comment. | File-level guardrail and evidence comment. | Guardrail exists; validate with user and improve clarity during finale. |
 | Open-source contributor/reviewer | New contributors lack project-specific context. | Ask a question in a supported spoken language. | Trace the answer to PR discussion, author and date before contributing. | Public repo walkthrough, reviewed transcript, source links and Time Machine. | Typed path exists; voice and additional-segment validation planned. |
+| Student developer | Real repositories are difficult to learn from when code and historical context are separated. | Understand why a feature or configuration was added. | Follow a file to the PR, issue and contributor that explain a project decision. | Guided sample walkthrough, relationship graph and evidence citations. | Include as an explicit target segment; validate the guided journey during the finale. |
 
 **Market validation:** No customer interviews are recorded in this audit. During the finale, capture three conversations with consent, noting each person's segment, initial assumption, observed evidence and resulting product change. Do not include identifying details without permission.
 
