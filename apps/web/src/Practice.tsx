@@ -11,7 +11,10 @@ type Problem = {
 type Result = {
   passed: number; total: number; language: Language; examples_only: boolean; topic?: string; walkthrough?: string
   cases: { category: string; status: string; duration: number }[]
+  assessment?: { points: number; measured: number; max: number; normalized: number
+    criteria: { id: string; name: string; points: number | null; max: number }[] }
 }
+type Recommendation = { next: { problem: string; difficulty: string } | null }
 type Attempt = Result & { id: string; problem: string; created: number }
 const starters: Record<Language, string> = {
   python: 'import json\nimport sys\n\n\ndef solve(data):\n    # Return the result for this exercise.\n    pass\n\n\nprint(json.dumps(solve(json.load(sys.stdin))))\n',
@@ -33,6 +36,7 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
   const [busy, setBusy] = useState<'example' | 'submission' | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [recommendation, setRecommendation] = useState<Recommendation['next']>(null)
 
   useEffect(() => {
     let alive = true
@@ -44,6 +48,8 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
     }).catch(error => { if (alive) setError(errorText(error)) }).finally(() => { if (alive) setLoading(false) })
     void api<Attempt[]>('/practice/attempts').then(items => { if (alive) setAttempts(items) })
       .catch(error => { if (alive) setError(errorText(error)) })
+    void api<Recommendation>('/practice/recommendation').then(data => { if (alive) setRecommendation(data.next) })
+      .catch(() => undefined)
     return () => { alive = false }
   }, [])
 
@@ -63,7 +69,13 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
         problem: problem.id, language, code, examples_only: examplesOnly,
       })
       setResult(next)
-      if (!examplesOnly) setAttempts(await api<Attempt[]>('/practice/attempts'))
+      if (!examplesOnly) {
+        const [history, nextProblem] = await Promise.all([
+          api<Attempt[]>('/practice/attempts'), api<Recommendation>('/practice/recommendation'),
+        ])
+        setAttempts(history)
+        setRecommendation(nextProblem.next)
+      }
     } catch (error) { setError(errorText(error)) }
     finally { setBusy(null) }
   }
@@ -81,6 +93,8 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
     {loading && <div className="status-panel" role="status">Loading exercises…</div>}
     {!loading && <div className="practice-grid">
       <aside className="library practice-library"><h2>Exercise catalog</h2>
+        {recommendation && recommendation.problem !== selected && <button className="button compact" disabled={!!busy}
+          onClick={() => select(recommendation.problem)}>Recommended next · {recommendation.difficulty}</button>}
         {catalog.map(item => <button disabled={!!busy} key={item.id} className={'library-item' + (selected === item.id ? ' active' : '')}
           onClick={() => select(item.id)}><Code size={17} /><span><strong>{item.title}</strong><small>{item.difficulty}</small></span></button>)}
       </aside>
@@ -116,6 +130,14 @@ export function Practice({ enabled, initialProblem }: { enabled: boolean; initia
           {output.cases.map((item, index) => <div className="case-row" key={index}>
             {item.status === 'passed' ? <CheckCircle size={18} /> : <XCircle size={18} />}
             <strong>{item.category}</strong><span>{feedback[item.status] ?? 'Unable to evaluate'}</span></div>)}
+          {output.assessment && <>
+            <h4>Points breakdown</h4>
+            <p>{output.assessment.points}/{output.assessment.measured} measured points · {output.assessment.max - output.assessment.measured} unmeasured</p>
+            {output.assessment.criteria.map(item => <div className="split action-row" key={item.id}>
+              <span>{item.name}</span><strong>{item.points == null ? 'Unmeasured' : item.points + '/' + item.max}</strong>
+            </div>)}
+            <p className="subtle">The efficiency points measure a large test within the time budget. Explanation needs qualitative review.</p>
+          </>}
           {output.topic && <><h4>{output.topic}</h4><p>{output.walkthrough}</p></>}
         </section>}
         {!!currentAttempts.length && <section className="panel rankings"><h2>Submission history</h2>

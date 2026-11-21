@@ -136,12 +136,13 @@ async def evaluate(body: Submission, authorization: str = Header(default="")):
         raise HTTPException(401, "Evaluator authorization failed.")
     if RUNNER_COUNT.locked():
         raise HTTPException(429, "The evaluator is busy.")
-    from .problems import PROBLEMS
+    from .problems import FUNCTIONAL_CASES, PROBLEM_VERSION, PROBLEMS
     problem = PROBLEMS.get(body.problem)
     if not problem:
         raise HTTPException(404, "Unknown exercise.")
     cases = [(value, output, "Example") for value, output in problem.examples]
     if not body.examples_only:
+        cases.append((*FUNCTIONAL_CASES[body.problem], "Functional"))
         cases += [(value, output, label) for (value, output), label in zip(
             problem.hidden, ("Edge case", "Boundary case", "Large input"), strict=True,
         )]
@@ -156,4 +157,4 @@ async def evaluate(body: Submission, authorization: str = Header(default="")):
         except SandboxUnavailable as exc:
             raise HTTPException(503, "The isolated evaluator is unavailable.") from exc
     passed = sum(row["status"] == "passed" for row in rows)
-    return {"cases": rows, "passed": passed, "total": len(rows)}
+    return {"cases": rows, "passed": passed, "total": len(rows), "version": PROBLEM_VERSION}

@@ -1,6 +1,7 @@
 
 from dataclasses import dataclass
 
+PROBLEM_VERSION = "2"
 
 @dataclass(frozen=True)
 class Problem:
@@ -19,7 +20,7 @@ class Problem:
             "id": self.id, "title": self.title, "difficulty": self.difficulty, "story": self.story,
             "contract": self.contract, "examples": [{"input": value, "output": expected}
                                                    for value, expected in self.examples],
-            "languages": ["python", "javascript"], "version": "1",
+            "languages": ["python", "javascript"], "version": PROBLEM_VERSION,
         }
 
 
@@ -117,3 +118,18 @@ PROBLEMS = {problem.id: problem for problem in (
              ({"jobs": [2] * 10000, "queries": [[0, 9999]] * 4000}, [20000] * 4000)),
             "Build a prefix sum with an initial zero. Answer each range with one subtraction."),
 )}
+
+FUNCTIONAL_CASES = {
+    "warehouse-reconciliation": ([["lime", 3], ["rice", -2], ["lime", 1]], {"lime": 4, "rice": -2}),
+    "earliest-duplicate": (["a", "b", "c"], None),
+    "support-coverage": ([[1, 4], [2, 3], [2, 4], [3, 5]], 3),
+    "room-booking": ([[8, 9], [2, 4], [1, 2], [5, 6]], [[1, 4], [5, 6], [8, 9]]),
+    "load-monitor": ({"requests": [4, 0, 8, 5], "window": 2}, 13),
+    "shipment-capacity": ({"capacities": [1, 4, 6, 10], "load": 5}, 2),
+    "helpdesk-priority": ([["add", "x", 5], ["resolve"], ["add", "y", 1], ["resolve"]], ["x", "y"]),
+    "office-network": ({"links": [["r", "s"], ["s", "t"], ["c", "z"]], "start": "t", "end": "r"}, 2),
+    "course-launch": ({"count": 4, "requirements": [[1, 0], [2, 3]]}, True),
+    "voucher-change": ({"values": [3, 7, 11], "total": 14}, 2),
+    "campaign-scheduling": ([[0, 4, 6], [4, 7, 4], [1, 7, 8]], 10),
+    "customer-retry": ({"jobs": [4, -2, 8], "queries": [[0, 2], [2, 2], [0, 0]]}, [10, 8, 4]),
+}

@@ -212,6 +212,10 @@ footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content: space-betwe
 .case-row { border-top: 1px solid var(--rule); padding: 8px 0; display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 5px; }
 .case-row svg { color: var(--green); }
 .career-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+.index-scores { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.index-scores article { padding: 10px; border-top: 1px solid var(--rule); }
+.index-scores strong { font: 29px Georgia, serif; }
+.index-scores small, .index-scores p { color: var(--muted); font: 12px/1.4 system-ui, sans-serif; }
 .career h2 { font-size: clamp(16px,2.2vw,22px); letter-spacing: -.026em; }
 .career h3 { font-size: 15px; overflow-wrap: anywhere; }
 .career .panel > p { margin-top: 6px; color: var(--muted); }
@@ -229,5 +233,6 @@ footer { display: flex; gap: 17px; flex-wrap: wrap; justify-content: space-betwe
 @media (max-width: 680px) {
   .practice-grid { grid-template-columns: minmax(0,1fr); gap: 13px; }
   .career-grid { grid-template-columns: minmax(0,1fr); }
+  .index-scores { grid-template-columns: minmax(0, 1fr); }
   .practice .panel { padding: 12px; }
 }

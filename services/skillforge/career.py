@@ -11,6 +11,8 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .db import attempts, engine, now, profiles, scans
+from .problem_scoring import best_assessments, developer_index
+from .scoring import RUBRIC
 
 router = APIRouter(prefix="/api/career")
 ROLES = {
@@ -101,6 +103,33 @@ def career(request: Request):
     with engine.connect() as connection:
         data, _ = stored_profile(connection, owner)
     return response_data(data)
+
+
+@router.get("/developer-index")
+def skills_index(request: Request):
+    from .main import current_session
+    owner = workspace(request)
+    login = (current_session(request) or {}).get("github")
+    with engine.connect() as connection:
+        assessed = connection.execute(select(attempts.c.problem, attempts.c.result).where(
+            attempts.c.owner == owner,
+        ).order_by(attempts.c.created.desc()).limit(250)).mappings().all()
+        engineering = None
+        repository = None
+        if login:
+            entries = connection.execute(select(scans.c.repo, scans.c.result).where(
+                scans.c.owner == owner, scans.c.state == "complete", scans.c.repo.startswith(login.lower() + "/"),
+            ).order_by(scans.c.created.desc(), scans.c.id.desc()).limit(100)).mappings()
+            seen = set()
+            for row in entries:
+                if row["repo"] in seen:
+                    continue
+                seen.add(row["repo"])
+                quality = row["result"]["quality"]
+                if quality["version"] == RUBRIC and quality["rankable"] and quality["score"] is not None:
+                    repository, engineering = row["repo"], quality["score"]
+                    break
+    return {**developer_index(engineering, best_assessments(assessed)), "repository": repository}
 
 
 @router.put("/target")

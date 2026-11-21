@@ -7,7 +7,7 @@ SkillForge Integrated helps students, developers, and working professionals eval
 ## Primary journey
 
 1. Paste a GitHub repository URL or connect GitHub and pick one or more repositories. Review what the app can access and start an analysis.
-2. See a ranked list of comparable repos and open a 100-point scorecard. Inspect the criteria, cited findings, amount of code analyzed, limitations, and fixes with the largest expected impact. Re-score a new commit and compare it with the previous revision.
+2. Review the project rubric, then open a 1,000-point scorecard and rankings for comparable repositories. Inspect the criteria, cited findings, amount of code analyzed, limitations, and fixes with the largest expected impact. Re-score a new commit and compare it with the previous revision.
 3. Open the code structure graph to see how files communicate through imports and calls. Select a file or function to inspect incoming and outgoing connections and jump to the linked source. Open decision history when it explains a connection or quality finding. Practice the underlying skill through a scenario such as reconciling stock updates or calculating peak support coverage from overlapping shifts.
 4. Submit code against a clear input/output contract. See sample test feedback, hidden test categories, execution limits, and an explanation after submission. Review your results alongside the repository scorecard.
 5. Optionally set a target role or paste a job description, attach evaluated evidence to your portfolio, review suggested actions, and export a career-readiness report.
@@ -25,21 +25,12 @@ SkillForge Integrated helps students, developers, and working professionals eval
 | R7 | Actions and practice | Opportunity gaps and portfolio findings can propose a challenge or governed action. Approval, dismissal and completion have explicit, audited transitions. The tracker, coaching, interview practice, readiness sprint and career simulations reuse account data with scenario assumptions and outcomes visible. Simulated changes never mutate the current baseline. |
 | R8 | Trust and operations | A non-owner cannot view, modify, export, or delete another workspace's data. Source previews are bounded and transmitted on demand. Provider keys stay out of telemetry. GitHub throttling and failed AI calls surface recoverable states. Reports and core planning remain usable during citation assistant, mail, or graph-provider outages where their dependencies allow. |
 | R9 | GitHub picker and scoring jobs | Support pasted public GitHub URLs and an opt-in GitHub connection that lists eligible repositories. Show the selected branch and evaluated commit SHA. Queue scoring with deduplication and visible progress. Disconnect stops new access. Scope supported repository access to the user's explicit selection. |
-| R10 | Code quality ranking | Score each eligible commit on a versioned 100-point rubric. Show dimension scores, weights, evidence pinned to source, coverage, remaining unknowns, and prioritized fixes. Rank a user's repositories within compatible rubric and stack cohorts. Tie equal scores and label insufficient coverage as unranked. Compare repeat scans at the same commit and changes over time. |
+| R10 | Code quality ranking | Score each eligible commit on a versioned, project-aware 1,000-point rubric. Preview applicable, excluded and uncertain criteria, then publish measured scores, weights, commit-pinned evidence, confidence and coverage. Compare compatible project, stack and measured-rubric cohorts. Tie equal scores and label insufficient coverage as unranked. Compare repeat scans at the same commit and changes over time. |
 | R11 | Scenario-based coding tests | Provide a curated catalog of real-life tasks that exercise data structures and algorithms, with sample cases, hidden edge and performance cases, language choice, submission history, and feedback. Judge with versioned problem data and publish problem topic and walkthrough after completion. Suggest relevant practice from repo findings where the connection is specific. |
 
 ## Code quality scoring
 
-| Dimension | Points | Evidence |
-| --- | ---: | --- |
-| Correctness and reliability | 25 | Error handling, failure paths, boundary checks, and static correctness signals |
-| Maintainability and design | 25 | Complexity, cohesion, duplication, readability, and module boundaries |
-| Testing and quality checks | 20 | Test presence, meaningful assertions and edge cases, and CI configuration visible in the snapshot |
-| Security and dependency hygiene | 15 | Defensive configuration, audited dependency metadata, and safe handling of sensitive data |
-| Performance | 10 | Evidence of costly operations, unbounded work, or avoidable allocations in relevant paths |
-| Documentation and reproducibility | 5 | Setup instructions, declared runtime and dependencies, and documented interfaces |
-
-The initial weights are proposed. Score applicable checks against a published, language-aware rubric. Use static analysis for measurable signals and AI for rubric-guided review of scoped source evidence. Require concrete file or line references for AI findings and let validated findings affect only predefined criteria. Keep the aggregation on the server. Pin the tool, model, rubric and commit versions and retain the accepted findings with each report. Show coverage separately, including skipped files, unsupported checks and sampled areas. Publish minimum coverage per cohort, label partial results and leave insufficient scans unranked. During AI downtime show the available static findings and withhold ranks that require the AI review. Exclude generated, vendored and binary files, and avoid rewarding repo size, GitHub stars or commit volume. Calibrate against independently reviewed examples across repo sizes and supported stacks. A score describes the code at a revision. A user's authorship requires separate contribution evidence.
+[Adaptive scoring](SCORING.md) defines project context detection, criteria review, normalization, grade thresholds, coverage, confidence and ranking rules.
 
 ## Coding assessment design
 

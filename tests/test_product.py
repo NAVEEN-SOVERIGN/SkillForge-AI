@@ -1,8 +1,10 @@
 
+import asyncio
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -17,10 +19,26 @@ from skillforge import config
 from skillforge.db import engine
 from skillforge.judge import matches
 from skillforge.main import app
+from skillforge.problem_scoring import assess_submission, best_assessments, developer_index, next_problem
+from skillforge.problems import PROBLEMS
 from skillforge.sample import SNAPSHOT
-from skillforge.scanning import compile_snapshot
+from skillforge.scanning import claim, compile_snapshot, perform
+from skillforge.scoring import finalize
 
 ORIGIN = {"Origin": config.ORIGIN}
+
+
+def repo_fixture(source, description="", truncated=False):
+    return {**SNAPSHOT, "repo": "tester/project", "revision": "b" * 40, "description": description,
+            "sources": source, "paths": set(source) | {"README.md", "package.json", "package-lock.json"},
+            "eligible": len(source), "total_files": len(source) + 3, "truncated": truncated}
+
+
+READER = repo_fixture({"reader.tsx": """export function Reader() {
+const [readingProgress, setProgress] = useState(0);
+localStorage.setItem('bookmark', String(readingProgress));
+return <main><button onClick={() => setProgress(1)}>Go to bookmark</button></main>;
+}"""}, "An offline ebook reader")
 
 
 def tearDownModule():
@@ -52,8 +70,100 @@ class GraphAndScoreTests(unittest.TestCase):
         self.assertTrue(matches([True, 4.0], [True, 4]))
         self.assertFalse(matches([1, 4], [True, 4]))
 
+    def test_offline_reader_excludes_account_concepts_but_detects_storage(self):
+        report = compile_snapshot(READER)["quality"]
+        criteria = {item["id"]: item for item in report["criteria"]}
+        self.assertEqual(report["archetype"], "Reader app")
+        self.assertEqual(report["scale"], 1000)
+        self.assertEqual(criteria["auth"]["relevance"], "not_applicable")
+        self.assertEqual(criteria["storage"]["relevance"], "applicable")
+        self.assertEqual(criteria["storage"]["evidence"]["line"], 3)
+        self.assertIn("Reading progress", [item["name"] for item in report["features"]])
+        claimed = finalize(report, expected=["auth"])
+        self.assertEqual(report["score"], claimed["score"])
+        self.assertLess(claimed["evaluationCoverage"], report["evaluationCoverage"])
+        self.assertFalse(claimed["rankable"])
+        self.assertEqual(next(item["relevance"] for item in claimed["criteria"] if item["id"] == "auth"), "uncertain")
+
+    def test_backend_saas_keeps_auth_and_permissions_distinct(self):
+        source = {"server.py": """from fastapi import FastAPI
+app = FastAPI()
+db = create_engine('sqlite://')
+
+@app.get('/account')
+def account():
+    return require_user()
+"""}
+        report = compile_snapshot(repo_fixture(source))["quality"]
+        self.assertEqual(report["archetype"], "Backend SaaS")
+        auth = next(item for item in report["criteria"] if item["id"] == "auth")
+        self.assertEqual(auth["checks"][0]["line"], 7)
+        self.assertIsNone(auth["checks"][1]["rate"])
+
+    def test_normalization_excludes_unmeasured_and_unrelated_weights(self):
+        def criterion(key, weight, rate, relevance="applicable", severity=None):
+            return {"id": key, "name": key, "relevance": relevance, "proposedWeight": weight,
+                    "checks": [] if relevance != "applicable" else [
+                        {"id": key, "dimension": key, "rate": rate, "severity": severity},
+                    ]}
+
+        report = {"archetype": "Fixture", "coverage": {"analyzed": 8, "percent": 100, "truncated": False},
+                  "criteria": [criterion("a", 400, 100), criterion("b", 400, 70),
+                               criterion("excluded", 200, None, "not_applicable")]}
+        normalized = finalize(report)
+        self.assertEqual(normalized["score"], 850)
+        self.assertEqual(normalized["grade"], "A")
+        self.assertEqual(normalized["evaluationCoverage"], 100)
+        report["criteria"].append(criterion("critical", 25, 0, severity="critical"))
+        self.assertEqual(finalize(report)["score"], 699)
+        report["criteria"][1]["checks"][0]["rate"] = None
+        self.assertLess(finalize(report)["evaluationCoverage"], 70)
+        self.assertFalse(finalize(report)["rankable"])
+
+    def test_assessments_and_developer_index_use_separate_scales(self):
+        results = [{"category": category, "status": outcome} for category, outcome in [
+            ("Example", "passed"), ("Functional", "passed"), ("Edge case", "passed"),
+            ("Boundary case", "wrong_answer"), ("Large input", "time_limit"),
+        ]]
+        partial = assess_submission(results, "python", "def solve(data):\n    return data\n")
+        self.assertEqual(partial["points"], 58)
+        self.assertEqual(partial["measured"], 85)
+        self.assertIsNone(partial["criteria"][-1]["points"])
+        high = {**partial, "normalized": 900}
+        rows = [{"problem": "load-monitor", "result": {"assessment": score}} for score in [partial, high]]
+        best = best_assessments(rows)
+        self.assertEqual(len(best), 1)
+        self.assertEqual(developer_index(800, best)["index"], 840)
+        self.assertIsNone(developer_index(800, {})["index"])
+        self.assertIsNone(developer_index(None, best)["index"])
+        first_three = dict.fromkeys(["warehouse-reconciliation", "earliest-duplicate", "load-monitor"], high)
+        self.assertEqual(next_problem(first_three, PROBLEMS)["difficulty"], "Intermediate")
+
 
 class WorkspaceTests(unittest.TestCase):
+    def test_scan_publishes_a_score_only_after_rubric_approval(self):
+        with TestClient(app) as owner, TestClient(app) as other:
+            owner.get("/api/session").raise_for_status()
+            other.get("/api/session").raise_for_status()
+            job = owner.post("/api/scans", json={"repository": "tester/project"}, headers=ORIGIN).json()
+            with patch("skillforge.scanning.get_snapshot", return_value=READER):
+                asyncio.run(perform(*claim()))
+            route = "/api/scans/" + job["id"]
+            draft = owner.get(route).json()
+            self.assertEqual(draft["state"], "review")
+            self.assertNotIn("summary", draft)
+            self.assertIsNone(draft["result"]["quality"]["score"])
+            self.assertNotIn("checks", draft["result"]["quality"]["criteria"][0])
+            self.assertEqual(other.post(route + "/rubric", json={}, headers=ORIGIN).status_code, 404)
+            self.assertEqual(owner.post(route + "/rubric", json={"expected": ["storage"]},
+                                        headers=ORIGIN).status_code, 422)
+            complete = owner.post(route + "/rubric", json={"expected": ["auth"], "note": "Expect sync"},
+                                  headers=ORIGIN).json()
+            self.assertEqual(complete["state"], "complete")
+            self.assertEqual(complete["summary"]["scale"], 1000)
+            self.assertFalse(complete["summary"]["rankable"])
+            self.assertEqual(complete["result"]["quality"]["review"]["note"], "Expect sync")
+
     def test_queue_is_origin_and_owner_scoped(self):
         with TestClient(app) as owner, TestClient(app) as other:
             owner.get("/api/session").raise_for_status()

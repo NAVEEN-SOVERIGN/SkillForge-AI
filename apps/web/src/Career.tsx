@@ -13,6 +13,8 @@ type CareerData = {
     audit: { action: string; state: string; at: number }[] }
 }
 type Attempt = { id: string; problem: string; passed: number; total: number; created: number }
+type Scores = { engineering: number | null; problemSolving: number | null; index: number | null
+  problems: number; provisional: boolean; repository: string | null }
 
 export function Career({ scans }: { scans: Scan[] }) {
   const [data, setData] = useState<CareerData | null>(null)
@@ -23,6 +25,7 @@ export function Career({ scans }: { scans: Scan[] }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+  const [scores, setScores] = useState<Scores | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -32,6 +35,7 @@ export function Career({ scans }: { scans: Scan[] }) {
       setTarget({ role: next.profile.role, description: next.profile.description, hours: next.profile.hours })
       setAttempts(history)
     }).catch(failure => { if (alive) setError(errorText(failure)) })
+    void api<Scores>('/career/developer-index').then(result => { if (alive) setScores(result) }).catch(() => undefined)
     return () => { alive = false }
   }, [])
 
@@ -65,6 +69,14 @@ export function Career({ scans }: { scans: Scan[] }) {
     {error && <p className="notice" role="alert">{error}</p>}
     {status && <p className="career-status" role="status"><Check size={16} /> {status}</p>}
     {!data && !error && <p className="status-panel" role="status">Loading career plan…</p>}
+    {scores && <section className="panel developer-index" aria-label="Developer index">
+      <div className="split"><h2>Developer Index</h2>{scores.provisional && <span className="eyebrow">Provisional</span>}</div>
+      <div className="index-scores">{[
+        ['Engineering', scores.engineering, scores.repository ?? 'Eligible score from a repo owned by your connected GitHub account'],
+        ['Problem solving', scores.problemSolving, scores.problems + ' distinct assessed exercises'],
+        ['Combined index', scores.index, '60% engineering and 40% problem solving'],
+      ].map(([name, score, detail]) => <article key={name}><h3>{name}</h3><strong>{score ?? '—'}{score != null && <small> / 1,000</small>}</strong><p>{detail}</p></article>)}</div>
+    </section>}
     {data && <>
       <div className="career-grid">
         <form className="panel form-stack" onSubmit={event => {
