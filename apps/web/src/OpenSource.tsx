@@ -19,7 +19,7 @@ function issuePreview(markdown: string) {
     .trim()
 }
 
-export function OpenSource({ onExplore }: { onExplore: (repo: string) => void }) {
+export function OpenSource({ onExplore, onRoadmap }: { onExplore: (repo: string) => void; onRoadmap: () => void }) {
   const [language, setLanguage] = useState('Python')
   const [label, setLabel] = useState('good first issue')
   const [page, setPage] = useState(1)
@@ -46,6 +46,7 @@ export function OpenSource({ onExplore }: { onExplore: (repo: string) => void })
     <header className="contributions-intro">
       <h1 id="contributions-title">Open source contributions</h1>
       <p>Find an unassigned GitHub issue in your stack. Explore the code in SkillForge or open the issue to get started.</p>
+      <button className="button primary" onClick={onRoadmap}>Projects and roadmap <ArrowRight size={16} /></button>
     </header>
 
     <div className="contributions-toolbar">

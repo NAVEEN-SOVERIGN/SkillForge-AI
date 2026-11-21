@@ -5,12 +5,15 @@ from io import BytesIO
 from typing import Literal
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from .config import COOKIE
+from .contribution_projects import PROJECTS, roadmap
 from .db import encode, entities, find_attempt, find_scan, now, recent_attempts, transaction, workspace_write
+from .github import contribution_activity
 from .problem_scoring import best_assessments, developer_index
 from .scoring import RUBRIC
 
@@ -120,6 +123,83 @@ def skills_index(request: Request):
                     repository, engineering = row["repo"], quality["score"]
                     break
     return {**developer_index(engineering, best_assessments(assessed)), "repository": repository}
+
+
+def contribution_plan(owner):
+    with transaction() as tx:
+        profile = stored_profile(tx, owner)
+        rows = tx.run("""
+            MATCH (s:SFScan {owner: $owner, state: 'complete'})
+            WITH s.repo AS repo, max(s.created) AS scanned
+            RETURN repo ORDER BY scanned DESC, repo LIMIT 6
+            """, owner=owner)
+        scans = [{"title": row["repo"], "url": "https://github.com/" + row["repo"],
+                  "kind": "repository scan"} for row in rows]
+        assessments = len(best_assessments(recent_attempts(tx, owner, 250)))
+    progress = profile.get("contribution_progress", {})
+    projects = [{**project, "completed": progress.get(project["id"], [])} for project in PROJECTS]
+    return {**roadmap(profile, requirements(profile), scans, assessments, projects),
+            "selected": profile.get("contribution_project")}
+
+
+@router.get("/contribution-roadmap")
+def contribution_roadmap(request: Request):
+    return contribution_plan(workspace(request))
+
+
+class ProjectProgress(BaseModel):
+    project: str = Field(max_length=60)
+    task: str | None = Field(default=None, max_length=60)
+    completed: bool = False
+
+
+@router.put("/contribution-roadmap")
+def update_contribution_roadmap(body: ProjectProgress, request: Request):
+    owner = workspace(request)
+    project = next((item for item in PROJECTS if item["id"] == body.project), None)
+    if not project or (body.task is not None and body.task not in {task["id"] for task in project["tasks"]}):
+        raise HTTPException(422, "Choose an available project and milestone.")
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        profile = stored_profile(tx, owner)
+        profile["contribution_project"] = body.project
+        if body.task is not None:
+            progress = profile.setdefault("contribution_progress", {})
+            completed = set(progress.get(body.project, []))
+            if body.completed:
+                completed.add(body.task)
+            else:
+                completed.discard(body.task)
+            progress[body.project] = sorted(completed)
+        save_profile(tx, owner, profile)
+    return contribution_plan(owner)
+
+
+@router.post("/contribution-roadmap/github")
+async def refresh_contribution_roadmap(request: Request):
+    from .main import current_session
+    owner = workspace(request)
+    login = (current_session(request) or {}).get("github")
+    if not login:
+        raise HTTPException(403, "Connect GitHub before importing public activity.")
+    try:
+        activity = await contribution_activity(login)
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, "GitHub activity is temporarily unavailable.") from exc
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        profile = stored_profile(tx, owner)
+        profile["github_activity"] = {**activity, "at": now()}
+        save_profile(tx, owner, profile)
+    return contribution_plan(owner)
+
+
+@router.delete("/contribution-roadmap/github")
+def clear_contribution_roadmap(request: Request):
+    owner = workspace(request)
+    with workspace_write(owner, request.cookies[COOKIE]) as tx:
+        profile = stored_profile(tx, owner)
+        profile.pop("github_activity", None)
+        save_profile(tx, owner, profile)
+    return contribution_plan(owner)
 
 
 @router.put("/target")

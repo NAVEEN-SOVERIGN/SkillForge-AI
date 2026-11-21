@@ -3,7 +3,8 @@ import { ArrowDown, Check, LinkSimple, Plus, Trash } from '@phosphor-icons/react
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, errorText } from './api'
-import type { Scan } from './api'
+import type { Scan, Session } from './api'
+import { ContributionRoadmap } from './ContributionRoadmap'
 
 type Action = { id: string; skill: string; state: 'proposed' | 'approved' | 'completed' | 'dismissed' }
 type Entry = { id: string; title: string; kind: string; label: string; note: string }
@@ -16,7 +17,9 @@ type Attempt = { id: string; problem: string; passed: number; total: number; cre
 type Scores = { engineering: number | null; problemSolving: number | null; index: number | null
   problems: number; provisional: boolean; repository: string | null }
 
-export function Career({ scans }: { scans: Scan[] }) {
+export function Career({ scans, session, focusRoadmap, onDiscover, onPractice }: {
+  scans: Scan[]; session: Session | null; focusRoadmap: boolean; onDiscover: () => void; onPractice: () => void
+}) {
   const [data, setData] = useState<CareerData | null>(null)
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [target, setTarget] = useState({ role: '', description: '', hours: 5 })
@@ -100,6 +103,9 @@ export function Career({ scans }: { scans: Scan[] }) {
           </div>)}</div>
         </section>
       </div>
+      <ContributionRoadmap session={session} focusOnMount={focusRoadmap} onDiscover={onDiscover} onPractice={onPractice}
+        refreshKey={JSON.stringify([data.profile.role, data.profile.description, data.profile.hours,
+          session?.login, completedScans.map(scan => scan.id)])} />
       <section className="panel plan-actions">
         <h2>Actions</h2>
         {!data.profile.actions.length && <p>Propose an action from the learning priorities.</p>}

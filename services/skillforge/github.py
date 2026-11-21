@@ -295,3 +295,36 @@ async def repository_history(http, repo, branch, revision, cutoff, files, fetch)
         row["date"] = row.pop("date_override", None) or row["date"]
     available = bool(history) or any(batch is not None for batch in (pulls, issues, commits))
     return sorted(history, key=lambda row: row["date"] or "", reverse=True), available
+
+
+async def contribution_activity(login):
+    if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", login):
+        raise GitHubError("The connected GitHub login could not be verified.")
+    async with client() as http:
+        batches = await asyncio.gather(*(
+            api(http, "/search/issues", {
+                "q": f"author:{login} is:public is:{kind}", "sort": "updated", "per_page": 15,
+            }, limit=1_500_000)
+            for kind in ("pr", "issue")
+        ))
+    items = []
+    prefix = "https://api.github.com/repos/"
+    for batch in batches:
+        for item in batch["items"]:
+            if not item["repository_url"].startswith(prefix) or (item.get("user") or {}).get("login", "").lower() != login.lower():
+                continue
+            try:
+                repo = repo_name(item["repository_url"].removeprefix(prefix))
+            except GitHubError:
+                continue
+            number = int(item["number"])
+            pull = item.get("pull_request")
+            state = "open" if item["state"] == "open" else "closed"
+            if pull is not None and pull.get("merged_at"):
+                state = "merged"
+            kind = state + (" pull request" if pull is not None else " issue")
+            path = "pull" if pull is not None else "issues"
+            items.append({"repo": repo, "title": item["title"][:240], "kind": kind, "draft": item.get("draft", False),
+                          "date": item["updated_at"], "url": f"https://github.com/{repo}/{path}/{number}"})
+    return {"items": sorted(items, key=lambda item: item["date"], reverse=True),
+            "partial": any(batch.get("incomplete_results") or batch["total_count"] > 15 for batch in batches)}
