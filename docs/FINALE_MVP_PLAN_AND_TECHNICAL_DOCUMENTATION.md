@@ -37,7 +37,7 @@ Complete primary and one additional segment journeys; validate demand through th
 | Time (IST) | Build / validation gate |
 |---|---|
 | **21 Nov, 2–4 PM** | Audit, choose one primary journey, agree scope and risks; submit the one-page plan by **4 PM**. |
-| 4–5 PM | Freeze API/data boundaries and native shell choice; establish baseline build and test results. |
+| 4–5 PM | Validate platform/device/toolchain; record code, asset and repository reuse rights; freeze API/data boundaries; capture baseline build, tests and known journey failures. |
 | 5–6 PM | Create native shell around existing React app; confirm app launch, deep links and permissions on the chosen device. |
 | 6–7 PM | Implement Sarvam server proxy/configuration and secure secret handling. |
 | 7–8 PM | Add voice capture, recording states, transcript and edit/submit affordance. |
@@ -48,7 +48,7 @@ Complete primary and one additional segment journeys; validate demand through th
 | **22 Nov, 12–1 AM** | Triage scan findings; create remediation log with severity, location, action and status. |
 | 1–2 AM | Fix critical findings; rerun focused checks. |
 | 2–3 AM | Fix high findings; record justified residual findings without hiding them. |
-| 3–4 AM | Check auth boundaries, secret exposure, request validation, upload/input limits and rate limiting. |
+| 3–4 AM | Check auth boundaries, secret exposure, request validation, upload/input limits and rate limiting; verify GitHub calls remain on approved API hosts, including redirects. |
 | 4–5 AM | Test the primary repository question and evidence path on a fresh evaluator profile. |
 | 5–6 AM | Test Guardrail, Déjà Vu, graph/time view and ADR export; document any sample/history limits. |
 | 6–7 AM | Test native install/launch and permission/network failure behavior on the target device. |
@@ -118,6 +118,23 @@ flowchart LR
 ```
 
 **Native shell decision:** reuse the existing React screens in a thin native container such as Capacitor, if device/toolchain validation succeeds in the first hour. The shell provides app launch, microphone permission and platform packaging; the existing Express API remains the authority for secrets, GitHub and Sarvam requests. The exact target OS/device is **[TO FILL after checking the team’s laptops, SDKs and evaluator requirement]**. If a reliable installable shell cannot be produced, keep the live web flow as the evaluator fallback and state that the native package is partial. Do not call a browser page a native app.
+
+### First-milestone architecture decisions to validate
+
+These are validation questions and scale-up boundaries, not claims that the prototype already implements them. Keep the current React/Express baseline during the 22-hour finale unless a measured blocker requires change; a framework/database rewrite would put the working journey at risk.
+
+| Decision | First milestone check | Longer-term direction if evidence supports it |
+|---|---|---|
+| Reuse rights and inputs | Record the prototype commit/revision, licenses and permission for reused code/assets; identify any imported user data and its owner. | Maintain a component/source inventory and repeatable provenance for future imports. |
+| Repository identity and version | Pin each scan to repository plus commit SHA when available; show the scanned revision and retrieval time with citations. | Versioned snapshots and re-indexing that preserve old citation references while reporting whether a source is still available. |
+| Storage authority | Identify the current JSON store as prototype storage; do not migrate real accounts during the finale without an approved owner and rollback plan. | Evaluate managed PostgreSQL with versioned migrations for identities, profiles, consent, evidence, approvals and job status. Keep Neo4j a derived, replaceable graph projection, not the authority for access control. |
+| Long-running import work | Measure current import duration and failure behavior; bound concurrency and cancellation. | Durable job records, idempotency keys, bounded retry/lease behavior and worker restart recovery if async ingestion becomes necessary. |
+| GitHub quota/cache | Track request counts, response status and reset headers without logging tokens; document current limits. | Shared quota state across replicas, bounded cache/coalescing, capped concurrency, cancellation, and separately metered optional deep retrieval. |
+| AI/provider policy | Make Gemini use explicit; keep evidence-only fallback, validate citation IDs and avoid logging content/secrets. Tell users before repository evidence leaves the server for a provider. | Provider adapters with deterministic fallback and opt-in BYOK only if a product need and secure storage model are validated. |
+| Graph correctness | Label unresolved or ambiguous symbols; preserve source and resolver provenance. | Language-aware import/call graph extraction, explicit resolution state, and atomic graph snapshot replacement so incomplete indexes do not replace a usable one. |
+| Retention/deletion | Decide whether voice audio is ephemeral; add consent copy and avoid retaining raw audio by default. Record any data retention behavior. | User-scoped deletion/expiry across PostgreSQL, graph projection, caches and temporary workspaces, with reconciliation and audit evidence. |
+
+The opening baseline should include measured import request count, elapsed time, indexed-file coverage, citation availability, score/ranking repeatability on fixed fixtures, and user-visible empty/partial/error behavior. Capture the current values as **[TO FILL from actual run]**, not assumed targets. Verify staging credentials and service capacity before relying on GitHub, Neo4j, Sarvam, Gemini or a native SDK during the live demo.
 
 ### Stack and rationale
 
@@ -199,12 +216,14 @@ Proposed endpoint: `POST /api/code-context/transcribe` (multipart or provider-su
 | User | `id`, normalized email, password hash, created time, demo flag; owns profile and private app records. |
 | Repository | owner/name, default branch, last indexed time, retrieval limits/status. |
 | EvidenceRecord | kind (commit/PR/issue/comment/design), source ID/URL, title/body excerpt, author/date, changed paths, related IDs, incident/rationale signals and retrieval provenance. |
+| RepositorySnapshot | repository identity, commit SHA, started/completed time, coverage and analyzer versions; citations refer to this snapshot where source links permit. |
+| AnalysisJob (future scale) | job ID, owner, snapshot ID, state, attempt/lease, idempotency key, progress and bounded error summary. Durable worker state is a scale-up design, not a current capability. |
 | CodeEntity | repository-relative file/symbol/config key; linked to evidence through changed-file/symbol relations. |
 | Decision/Incident | Candidate labels only when supported by source text; link back to source evidence. |
 | VoiceRequest (ephemeral) | request ID, status and sanitized timing/provider outcome; do not persist raw audio by default. |
 | SecurityFinding | ArgosX scan date, severity, location, remediation, status, residual-risk rationale and report reference. |
 
-Current DB persistence is JSON and Code Context graph persistence is optional Neo4j. During finale, do not claim the JSON store is a production-grade database. Record the migration target and migration plan as **[TO FILL after choosing from team-supported options]**; avoid risky schema migration during the short MVP unless it is necessary for the demo.
+Current DB persistence is JSON and Code Context graph persistence is optional Neo4j. During finale, do not claim the JSON store is a production-grade database. Record the migration target and migration plan as **[TO FILL after choosing from team-supported options]**; avoid risky schema migration during the short MVP unless it is necessary for the demo. Longer term, relational storage should own identity, consent, authorization and job state; Neo4j should be a scoped projection keyed by user/repository/snapshot. Provision a replacement graph snapshot and verify it before retiring the previous usable snapshot. Apply access revocation/deletion in the authoritative store first, then retry graph/cache cleanup until reconciled.
 
 ## 7. Authentication, Security and Reliability
 
@@ -225,6 +244,9 @@ Current DB persistence is JSON and Code Context graph persistence is optional Ne
 | Storage loss/corruption | Preserve atomic JSON writes; back up before migration; Render free storage is ephemeral per `render.yaml`; choose durable managed persistence for real accounts. |
 | Provider/GitHub outage | Timeouts, clear retry/error states, typed question fallback, deterministic answer fallback and honest “not found” responses. Do not claim availability guarantees. |
 | Audio privacy | Request consent, show recording, stop/cancel, keep audio ephemeral, avoid logging/storing audio; review Sarvam retention terms before enabling. |
+| Tenant/snapshot leakage | Scope every stored/imported record by owner and repository; test two accounts importing the same repository; keep graph lookup behind authorization and do not expose another user’s private profile or job state. |
+| Redirect/SSRF abuse | Allow only approved GitHub API hosts in server-side fetches; validate redirect behavior and never forward credentials to a different origin. |
+| Durable deletion and retention | Record retention period **[TO FILL]**; test deletion/expiry across authoritative storage, graph, cache and any temporary analysis workspace before claiming complete deletion. |
 
 **ArgosX process (required):** run baseline against the build/API and save the original report by **21 Nov 2026, 11:59 PM IST**. Triage all findings, fix critical and high severity first, rerun relevant tests and record accepted residuals with reason. Run final scan and save report by **22 Nov 2026, 11:00 AM IST**. Submit both reports and the remediation log. Scan target, report IDs, findings and scores are **[TO FILL from actual ArgosX run]**; no scan result is claimed here.
 
@@ -240,21 +262,24 @@ Current DB persistence is JSON and Code Context graph persistence is optional Ne
 
 **Finale gates:**
 
-1. Unit tests: transcript/request validation, line matching/normalization, fallback rules, input limits and evidence citation validation.
-2. API integration: valid/invalid GitHub URL, nonexistent/private repository, GitHub rate limit, timeout/network failure, empty or oversized audio, Sarvam timeout/invalid response, user auth/ownership, graph unavailable, Gemini unavailable.
-3. Journey checks on fresh user: repository -> question (typed and voice) -> editable transcript -> cited answer -> evidence/graph/time -> guardrail -> ADR export.
-4. Native smoke: install/open on the selected device, microphone permission grant/deny, background/cancel behavior, network loss, keyboard navigation and screen-size check.
-5. Regression: existing authentication/demo, primary career workflow and unaffected Code Context features.
-6. Release: `npm run typecheck`, `npm test`, `npm run build`; launch candidate deployment and use a clean evaluator profile. Attach logs/screenshots where allowed and never include secrets.
-7. Security: ArgosX baseline, fix critical/high, verify fixes, final ArgosX scan; attach both reports and completed remediation log.
+1. Unit tests: transcript/request validation, line matching/normalization, fallback rules, input limits, evidence citation validation, access-control scope and idempotent job transitions if jobs are introduced.
+2. API integration: valid/invalid GitHub URL, nonexistent/private repository, GitHub rate limit/reset headers, timeout/network failure, oversized/empty audio, Sarvam timeout/invalid response, user auth/ownership, graph unavailable, Gemini unavailable and provider-consent behavior.
+3. Journey checks on fresh users: repository -> question (typed and voice) -> editable transcript -> cited answer -> evidence/graph/time -> guardrail -> ADR export; verify two users can independently inspect the same public repository without sharing account data.
+4. Native smoke: install/open on selected device, microphone permission grant/deny, background/cancel behavior, network loss, keyboard/screen-reader alternatives to graph-only interactions, mobile width, loading/empty/partial/error states and PDF/ADR rendering.
+5. Regression: existing authentication/demo, primary career workflow and unaffected Code Context features. Re-run fixed fixtures to confirm repeatable citations/ranking after any analyzer or model/config change.
+6. Resilience: duplicate requests, upstream throttling, retry bounds, worker pause/restart and graph replacement/deletion reconciliation when those components exist. Do not claim durable worker recovery while work is synchronous/in-memory.
+7. Release: `npm run typecheck`, `npm test`, `npm run build`; deploy staging/candidate; verify health, clean evaluator journey, backup and rollback procedure. Record measured core read latency, import duration, request count, coverage and scan results as **[TO FILL]**. Reliability targets remain proposals until measured on representative staging load.
+8. Security: ArgosX baseline, fix critical/high, verify fixes, final ArgosX scan; attach both reports and completed remediation log. Also review dependency/secret scans, migrations, redirect host allowlists, content rendering, privacy/retention disclosures and user-scoped access.
 
 ## 9. Deployment and Operational Plan
 
 The repository’s `render.yaml` defines a Render Node web service, runs the production build, starts `npm start`, and checks `/api/health`. It generates `JWT_SECRET`; Gemini, Neo4j, GitHub token and persistent disk are optional/configurable. The current blueprint uses the free plan and explicitly warns that storage is ephemeral. Before the finale, set allowlisted `CLIENT_ORIGIN`, use unique server-only secrets, confirm GitHub token authentication log without printing the token, and keep deterministic fallback usable. Deploy the web build first, verify `/api/health` and the primary flow, then package/install the native wrapper against the same API base URL. Native artifact, signing, store distribution and live deployment URL for finale: **[TO FILL]**.
 
+For a future production release, deploy to staging first; keep secrets in the host’s secret manager; use redacted structured logs with request/job IDs and monitor health, queue lag and provider failures; assign an alert/release owner **[TO FILL]**; verify backup restore and rollback; then use a limited pilot with explicit go/no-go evidence. Define availability, read-latency, import-progress, workspace TTL, RPO/RTO and cleanup targets only after capturing a baseline and measuring representative load. Record proposed targets and approval here: **[TO FILL]**.
+
 ## 10. Scale Path and Persona Use Case Matrix
 
-Scale from a sampled public-repository demo to a multi-user product only after the core flow and user need are validated: move JSON persistence to a managed transactional database; add background repository ingestion and incremental webhooks; persist normalized evidence with provenance and source version; use shared rate limits and job queues; add repository access controls/OAuth for private repos only after security review; improve retrieval using graph traversal and measured ranking evaluation; add observability, retention controls and tenant isolation. Maintain citations and abstention as hard requirements. Any forecast or performance target needs measurement **[TO FILL]**.
+Scale from a sampled public-repository demo to a multi-user product only after the core flow and user need are validated: move JSON persistence to a managed transactional database with versioned migrations; add background repository ingestion and incremental webhooks; persist normalized evidence with provenance and source revision; use shared rate limits, cache and durable idempotent jobs; add repository access controls/OAuth for private repos only after security review; improve retrieval using scoped graph traversal, language-aware import/call-site resolution, coverage labels and measured ranking evaluation; add observability, retention controls, deletion reconciliation, backups and tenant isolation. Keep graph snapshots replaceable and only switch readers after a replacement is validated. Maintain citations and abstention as hard requirements. Any forecast or performance target needs measurement **[TO FILL]**.
 
 | Persona | Problem | Use case 1 | Use case 2 | Feature | Status at audit / finale target |
 |---|---|---|---|---|---|
