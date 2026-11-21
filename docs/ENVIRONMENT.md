@@ -1,6 +1,6 @@
 # Environment and credential handoff
 
-Use the existing Hackfront values through a local ignored environment file or the staging secret store when implementation starts. This planning repository requires no credentials. Use separate staging and production secrets and exact OAuth callback URLs for the new host. Check configuration by field name and provider status without printing values.
+Use an ignored local environment file or the staging secret store for live integrations. The seeded workspace and public URL import can run without credentials. Use separate staging and production secrets and exact OAuth callback URLs for the new host. Review [.env.example](../.env.example) for the implemented settings and [operations](OPERATIONS.md) for startup commands. The inventory below includes deferred integration settings from the two reference applications.
 
 | Settings | Integration |
 | --- | --- |

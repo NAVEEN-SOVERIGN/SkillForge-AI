@@ -18,8 +18,9 @@ from sqlalchemy import delete, insert, select
 
 from . import config
 from .career import router as career_router
-from .db import attempts, digest, engine, metadata, now, profiles, provision, scans, session, sessions, touch
+from .db import attempts, digest, engine, now, profiles, provision, scans, session, sessions, touch
 from .github import GitHubError, api, client, public_repositories, read_source, repo_name
+from .migrate import migrate, require_current_schema
 from .practice import router as practice_router
 from .review import enabled as ai_enabled
 from .sample import SNAPSHOT, SOURCES
@@ -32,7 +33,7 @@ OAUTH_COOKIE = "__Host-skillforge-oauth" if config.PRODUCTION else "skillforge-o
 
 @asynccontextmanager
 async def lifespan(_app):
-    await asyncio.to_thread(metadata.create_all, engine)
+    await asyncio.to_thread(require_current_schema if config.PRODUCTION else migrate)
     worker = asyncio.create_task(run_scans()) if WORKER_ENABLED else None
     try:
         yield
